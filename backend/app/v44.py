@@ -118,7 +118,7 @@ def _result_payload(result, target_meta: dict[str, Any]) -> dict[str, Any]:
     }
     data["iem_count"] = len(data["per_iem"])
     data["exact_1000_hz"] = True
-    data["unresolved_stages"] = ["G", "C", "Broad", "Local", "Feature Classification", "Delta Safe"]
+    data["unresolved_stages"] = [name for name, status in data.get("stage_status", {}).items() if status.startswith("SPEC_BLOCKED")]
     data["warnings"] = list(data["warnings"])
     actual_name = target_meta.get("name")
     if actual_name != DEFAULT_BASE_TARGET:
@@ -138,7 +138,8 @@ def v44_status() -> dict[str, Any]:
         "normalization_anchor_hz": NORMALIZATION_HZ,
         "sample_rate_hz_default": DEFAULT_SAMPLE_RATE,
         "consensus_epsilon_db": CONSENSUS_EPSILON_DB,
-        "unlocked_stages": ["G", "C", "Broad", "Local", "Feature Classification", "Delta Safe"],
+        "unlocked_stages": ["G", "C", "Delta Safe"],
+        "spec_blocked_stages": ["Broad", "Local", "Feature Classification"],
         "warnings": [] if metadata.get("name") == DEFAULT_BASE_TARGET else ["Requested default target identifier is not currently represented by the stored target metadata."],
     }
 

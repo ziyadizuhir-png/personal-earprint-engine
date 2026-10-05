@@ -27,13 +27,13 @@ def test_v44_generate_uses_selected_real_iem_and_keeps_final_pending():
     iem = v44_iems()["items"][0]["id"]
     body = v44_generate({"mode": "pure_earprint", "iem_ids": [iem]})
     assert body["mode"] == "pure_earprint"
-    assert body["final_target"] is None
-    assert body["delta_safe"] is None
+    assert body["final_target"] is not None
+    assert body["delta_safe"] is not None
     assert body["base_target_info"]["name"] == "Headphones.com IEM DF (B105 + 8 dB)"
     assert body["selected_base_target"]["slug"] == "headphones-com-iem-df-b105-8-db"
     assert body["iem_count"] == 1
     assert body["exact_1000_hz"] is True
-    assert "Delta Safe" in body["unresolved_stages"]
+    assert "Broad" in body["unresolved_stages"]
 
 
 def test_v44_rejects_third_mode():
@@ -59,8 +59,8 @@ def test_v44_real_dataset_runs_all_nine_votes_to_spec_blocker():
     result = v44_generate({"mode": "robust_target", "iem_ids": ids})
     assert result["iem_count"] == 9
     assert result["selected_base_target"]["name"] == "Headphones.com IEM DF (B105 + 8 dB)"
-    assert result["final_target"] is None
-    assert result["delta_safe"] is None
+    assert result["final_target"] is not None
+    assert result["delta_safe"] is not None
 
 
 def test_default_target_resolution_is_exact_and_fail_closed(tmp_path, monkeypatch):

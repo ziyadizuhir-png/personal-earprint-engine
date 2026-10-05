@@ -19,8 +19,8 @@ def test_master_grid_anchor_statistics_and_pending_stages():
     assert result.normalized_base_target.level_db[1] == 0
     assert result.mad.level_db == [0.0] * len(f)
     assert len(result.n_plus) == len(f) and len(result.n_minus) == len(f) and len(result.n_zero) == len(f)
-    assert result.final_target is None
-    assert result.delta_safe is None
+    assert result.final_target is not None
+    assert result.delta_safe is not None
 
 def test_frequency_ownership_and_exact_linear_fade():
     f, base, _ = fixture(); delta = curve(f, np.full_like(f, 2.0)); out = construct_target(base, delta)

@@ -78,6 +78,7 @@ class V44Result:
     feature_classification: list[str] | None = None
     delta_safe: Curve | None = None
     final_target: Curve | None = None
+    stage_status: dict[str, str] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -198,18 +199,28 @@ def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "r
     n_plus = np.sum(matrix > ConsensusEpsilonDb, axis=0).astype(int).tolist()
     n_minus = np.sum(matrix < -ConsensusEpsilonDb, axis=0).astype(int).tolist()
     n_zero = np.sum(np.abs(matrix) <= ConsensusEpsilonDb, axis=0).astype(int).tolist()
-    result = V44Result(mode, bf.tolist(), _curve(bf, by), _curve(bf, bn), per_iem, {k: _curve(bf, v) for k, v in zip([x.id for x in iems], deltas)}, _curve(bf, median), _curve(bf, mad), n_plus, n_minus, n_zero)
+    n_active = np.asarray(n_plus, dtype=int) + np.asarray(n_minus, dtype=int)
+    g_values = np.divide(np.abs(np.asarray(n_plus) - np.asarray(n_minus)), n_active, out=np.zeros_like(median), where=n_active != 0)
+    c_values = np.divide(np.maximum(np.asarray(n_plus), np.asarray(n_minus)), n_active, out=np.zeros_like(median), where=n_active != 0)
+    c_curve = _curve(bf, c_values) if np.all(n_active != 0) else None
+    result = V44Result(mode, bf.tolist(), _curve(bf, by), _curve(bf, bn), per_iem, {k: _curve(bf, v) for k, v in zip([x.id for x in iems], deltas)}, _curve(bf, median), _curve(bf, mad), n_plus, n_minus, n_zero, G=_curve(bf, g_values), C=c_curve)
     for curves in result.per_iem.values():
         measured = np.asarray(curves["normalized_measured_fr"].level_db)
         desired = np.asarray(curves["desired_response"].level_db)
         curves["original_preferred_correction"] = _curve(bf, desired - measured)
-    if delta_safe is None:
-        result.warnings.append("G, C, Broad, Local, Feature Classification, and Delta Safe formulas are not locked in V4.4; final target is intentionally pending.")
-    else:
-        result.delta_safe = delta_safe
-        result.final_target = construct_target(base_target, delta_safe)
-        final = np.asarray(result.final_target.level_db)
-        for curves in result.per_iem.values():
-            measured = np.asarray(curves["normalized_measured_fr"].level_db)
-            curves["required_correction"] = _curve(bf, final - measured)
+    result.delta_safe = delta_safe or result.median_delta
+    result.final_target = construct_target(base_target, result.delta_safe)
+    result.stage_status = {
+        "G": "IMPLEMENTED",
+        "C": "IMPLEMENTED; undefined at frequencies with Nactive=0",
+        "Broad": "SPEC_BLOCKED: smooth operator and exact 1/12-octave implementation are not numerically defined",
+        "Local": "SPEC_BLOCKED: depends on BroadShape",
+        "Feature Classification": "SPEC_BLOCKED: qualitative rules lack executable thresholds/categories",
+        "Delta Safe": "IMPLEMENTED_DEFAULT: Delta_safe = Delta_median; local safety edits not applied",
+    }
+    result.warnings.append("Broad/Local/Feature Classification local analysis remains specification-blocked; Delta Safe uses the locked default Delta_median without local edits.")
+    final = np.asarray(result.final_target.level_db)
+    for curves in result.per_iem.values():
+        measured = np.asarray(curves["normalized_measured_fr"].level_db)
+        curves["required_correction"] = _curve(bf, final - measured)
     return result

@@ -1,5 +1,7 @@
 # ZUHIR Personal Earprint V4.4 — Backbone Reference
 
+> Superseded for mathematical authority by `docs/ZUHIR_PERSONAL_EARPRINT_V4.4_FINAL_LOCKED_SPEC.md`.
+
 ## Target modes
 
 Exactly two:
