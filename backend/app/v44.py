@@ -18,7 +18,6 @@ from engine.v44.constants import (
 from .storage import BASE_TARGET_ROOT, IEM_ROOT
 
 router = APIRouter(prefix="/api/v44", tags=["v44"])
-HEADPHONES_TARGET_SLUG = "headphones-com-iem-df-tilt-0-8-db-oct-b105-5-db"
 
 
 def _metadata(folder: Path) -> dict[str, Any]:
@@ -68,9 +67,32 @@ def _iem(folder: Path) -> IEMInput:
     )
 
 
+def _default_target_folder() -> Path | None:
+    candidates: list[tuple[int, str, Path]] = []
+    for folder in sorted(BASE_TARGET_ROOT.iterdir()) if BASE_TARGET_ROOT.exists() else []:
+        if not folder.is_dir():
+            continue
+        metadata = _metadata(folder)
+        name = str(metadata.get("name", ""))
+        identifier = str(metadata.get("identifier", metadata.get("id", "")))
+        normalized = " ".join(f"{name} {identifier}".lower().replace("_", " ").split())
+        wanted = " ".join(DEFAULT_BASE_TARGET.lower().replace("_", " ").split())
+        score = 0
+        if metadata.get("is_default") is True or metadata.get("default_base_target") is True:
+            score = 100
+        elif wanted in normalized:
+            score = 90
+        elif "headphones.com" in normalized and "iem df" in normalized:
+            score = 50
+        if score:
+            candidates.append((score, folder.name, folder))
+    return sorted(candidates, key=lambda item: (-item[0], item[1]))[0][2] if candidates else None
+
+
 def _base_target(slug: str | None = None) -> tuple[Path, dict[str, Any], Curve]:
-    target_slug = slug or HEADPHONES_TARGET_SLUG
-    folder = BASE_TARGET_ROOT / target_slug
+    folder = BASE_TARGET_ROOT / slug if slug else _default_target_folder()
+    if folder is None:
+        raise HTTPException(404, f"No repository target matches default identifier: {DEFAULT_BASE_TARGET}")
     if not folder.is_dir():
         raise HTTPException(404, f"Base Target not found: {target_slug}")
     metadata = _metadata(folder)
@@ -96,8 +118,8 @@ def _result_payload(result, target_meta: dict[str, Any]) -> dict[str, Any]:
 
 @router.get("/status")
 def v44_status() -> dict[str, Any]:
-    folder = BASE_TARGET_ROOT / HEADPHONES_TARGET_SLUG
-    metadata = _metadata(folder)
+    folder = _default_target_folder()
+    metadata = _metadata(folder) if folder else {}
     return {
         "version": "4.4",
         "target_modes": ["robust_target", "pure_earprint"],
@@ -107,7 +129,7 @@ def v44_status() -> dict[str, Any]:
         "sample_rate_hz_default": DEFAULT_SAMPLE_RATE,
         "consensus_epsilon_db": CONSENSUS_EPSILON_DB,
         "unlocked_stages": ["G", "C", "Broad", "Local", "Feature Classification", "Delta Safe"],
-        "warnings": [] if metadata.get("name") == DEFAULT_BASE_TARGET else ["Requested default target label does not match the stored repository target metadata."],
+        "warnings": [] if metadata.get("name") == DEFAULT_BASE_TARGET else ["Requested default target identifier is not currently represented by the stored target metadata."],
     }
 
 
@@ -124,12 +146,13 @@ def v44_iems() -> dict[str, Any]:
 
 @router.get("/targets")
 def v44_targets() -> dict[str, Any]:
+    default_folder = _default_target_folder()
     items = []
     for folder in sorted(BASE_TARGET_ROOT.iterdir()) if BASE_TARGET_ROOT.exists() else []:
         if not folder.is_dir():
             continue
         metadata = _metadata(folder)
-        items.append({"id": folder.name, "name": metadata.get("name", folder.name), "kind": "base", "metadata": metadata, "is_default": folder.name == HEADPHONES_TARGET_SLUG})
+        items.append({"id": folder.name, "name": metadata.get("name", folder.name), "kind": "base", "metadata": metadata, "is_default": default_folder == folder})
     return {"items": items, "default_target": DEFAULT_BASE_TARGET}
 
 
