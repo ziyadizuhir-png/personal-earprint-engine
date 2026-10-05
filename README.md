@@ -1,100 +1,89 @@
-Personal Earprint Engine
+# Personal Earprint Engine — Web App Backbone
 
-A personal earprint engine for generating Robust Targets and Pure EarPrint IEM targets from listener-adjusted measurements.
+Backbone for the Personal Earprint Engine V4.4.
 
-What It Does
+## Current scope
 
-This project processes listener-adjusted IEM responses and measured IEM frequency responses to generate a personal target based on the listener's own earprint.
+This starter provides a working foundation for:
 
-The goal is simple:
+- IEM Library
+- Add IEM upload form
+- Measurement FR upload
+- SoundEQ Dore PEQ upload
+- Automatic IEM folder creation
+- Automatic measurement preparation
+- Exact 1000 Hz preparation when the source does not contain 1000 Hz
+- Automatic `metadata.json`
+- Basic validation
+- Local persistent IEM storage
+- FastAPI backend
+- Next.js frontend
 
-- Keep the listener's personal response characteristics
-- Reduce unreliable or inconsistent features
-- Generate a stable target for IEM tuning
-- Allow the resulting target to be validated against measured IEM responses
+## Not implemented yet
 
-Target Modes
+The full V4.4 target-generation mathematics is intentionally not implemented in this backbone.
 
-The engine has two target modes:
+Do not invent the currently-unlocked V4.4 formulas for:
 
-Robust Target
+- G
+- C
+- Broad / Local separation
+- Feature Classification thresholds
+- Delta Safe thresholding
 
-A statistically robust personal target that keeps consistent earprint features while reducing features that are less reliable across the available measurements.
+Those must be locked before production implementation.
 
-Pure EarPrint
+## Project layout
 
-A target that represents the listener's personal earprint with minimal robustness processing.
+```text
+backend/
+  app/
+    main.py
+    ingest.py
+    models.py
+    storage.py
+  requirements.txt
 
-There is no Hybrid Graph and no third hybrid target mode.
+frontend/
+  app/
+    page.tsx
+    globals.css
+    layout.tsx
+  package.json
+  tsconfig.json
 
-Measurements
+data/
+  iems/
+  base-targets/
+  targets/
 
-The engine can use IEM frequency-response measurements obtained from third-party sources, measurement databases, websites, or other published measurement resources.
+engine/
+  v44/
+    constants.py
+    README.md
 
-Third-party measurements are used only as input data for generating personal targets.
+docs/
+  V44_SPEC.md
+```
 
-The measurements remain the property of their respective owners.
+## Development
 
-This project does not claim ownership of third-party measurement data.
+Backend:
 
-Personal Use
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
 
-STRICTLY FOR PERSONAL, NON-COMMERCIAL USE.
+Frontend:
 
-This project is intended for personal IEM tuning and experimentation.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-Users are responsible for following the terms, licenses, copyright requirements, and usage conditions of the original measurement sources.
+Open the frontend shown by Next.js.
 
-Do not redistribute third-party measurement data unless redistribution is explicitly permitted by the original source.
-
-Processing
-
-The engine is designed around:
-
-- Listener-adjusted IEM responses
-- Frequency-response normalization
-- Personal earprint extraction
-- Robust statistical aggregation
-- Median-based response analysis
-- Measurement consistency analysis
-- Personal target generation
-- Target validation
-- IEM EQ and tuning experimentation
-
-Raw IEM frequency responses are not simply averaged to create the personal target.
-
-Important Note
-
-The resulting earprint is a personal audio-tuning model.
-
-It is not:
-
-- A clinical hearing profile
-- A medical hearing test
-- An anatomical HRTF measurement
-- A diagnostic tool
-- A replacement for professional hearing assessment
-
-Data & Ownership
-
-The original code and documentation in this repository belong to the project author unless otherwise stated.
-
-Third-party measurements and other external resources remain subject to their respective owners, licenses, copyrights, and terms of use.
-
-Third-party data should be treated as external input data and not as original project data.
-
-Project Status
-
-This is an ongoing personal project.
-
-The processing pipeline, algorithms, validation methods, and implementation may change as the project develops.
-
-License
-
-Unless otherwise stated, the original code and documentation in this repository are intended for personal, non-commercial use only.
-
-Third-party measurements and external resources are not covered by this repository's license and remain subject to their respective terms.
-
-Author
-
-Zuhir Ziyadi
+Set `NEXT_PUBLIC_API_URL` when the backend is not on `http://localhost:8000`.
