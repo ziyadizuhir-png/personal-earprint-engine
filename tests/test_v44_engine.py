@@ -37,3 +37,14 @@ def test_raw_input_unchanged_and_modes_are_exactly_two():
     assert generate(base, [iem], "pure_earprint").mode == "pure_earprint"
     assert generate(base, [iem], "robust_target").mode == "robust_target"
     assert iem.prepared_measurement.level_db == before
+
+def test_v44_inputs_require_exact_1000_hz_anchor():
+    f = np.array([20., 900., 1100., 14000., 20000.])
+    base = curve(f, np.zeros_like(f))
+    iem = IEMInput("x", base, base, "PK,1000,0,1")
+    try:
+        generate(base, [iem])
+    except ValueError as exc:
+        assert "exact 1000 Hz" in str(exc)
+    else:
+        raise AssertionError("unprepared V4.4 input was accepted")

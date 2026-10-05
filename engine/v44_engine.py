@@ -95,6 +95,12 @@ def normalize_at_1000(f: np.ndarray, y: np.ndarray) -> np.ndarray:
     return y - float(np.interp(math.log(AnchorHz), np.log(f), y))
 
 
+def require_exact_1000_hz(f: np.ndarray, label: str) -> None:
+    """Reject unprepared V4.4 inputs instead of silently interpolating the anchor."""
+    if not np.any(np.isclose(f, AnchorHz, rtol=0.0, atol=1.0e-12)):
+        raise ValueError(f"{label} must contain an exact 1000 Hz calculation anchor")
+
+
 _FILTER_RE = re.compile(
     r"(?:Filter\s*\d+\s*:\s*)?(PK|HS|LS)\s*(?:Fc\s*)?([0-9.]+)\s*(?:Hz)?\s*(?:Gain\s*)?([-+]?[0-9.]+)\s*(?:dB)?\s*(?:Q\s*)?([0-9.]+)", re.I
 )
@@ -163,6 +169,7 @@ def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "r
     if mode not in {"robust_target", "pure_earprint"}:
         raise ValueError("V4.4 has exactly two target modes")
     bf, by = base_target.array()
+    require_exact_1000_hz(bf, "Base Target")
     if bf[0] > 20 or bf[-1] < 14000:
         raise ValueError("base target must cover the complete V4.4 ownership range")
     bn = normalize_at_1000(bf, by)
@@ -170,6 +177,7 @@ def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "r
     deltas: list[np.ndarray] = []
     for iem in iems:
         mf, my = iem.prepared_measurement.array()
+        require_exact_1000_hz(mf, f"Prepared measurement for {iem.id}")
         mi = interpolate_log(mf, my, bf)
         mi_n = normalize_at_1000(bf, mi)
         peq = reconstruct_peq(parse_peq(iem.peq_text), bf, sample_rate_hz)

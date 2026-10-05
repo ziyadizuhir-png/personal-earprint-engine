@@ -68,38 +68,41 @@ def _iem(folder: Path) -> IEMInput:
 
 
 def _default_target_folder() -> Path | None:
-    candidates: list[tuple[int, str, Path]] = []
+    candidates: list[tuple[str, Path]] = []
+    wanted = "".join(ch for ch in DEFAULT_BASE_TARGET.lower() if ch.isalnum())
     for folder in sorted(BASE_TARGET_ROOT.iterdir()) if BASE_TARGET_ROOT.exists() else []:
         if not folder.is_dir():
             continue
         metadata = _metadata(folder)
         name = str(metadata.get("name", ""))
         identifier = str(metadata.get("identifier", metadata.get("id", "")))
-        normalized = " ".join(f"{name} {identifier}".lower().replace("_", " ").split())
-        wanted = " ".join(DEFAULT_BASE_TARGET.lower().replace("_", " ").split())
-        score = 0
-        if metadata.get("is_default") is True or metadata.get("default_base_target") is True:
-            score = 100
-        elif wanted in normalized:
-            score = 90
-        elif "headphones.com" in normalized and "iem df" in normalized:
-            score = 50
-        if score:
-            candidates.append((score, folder.name, folder))
-    return sorted(candidates, key=lambda item: (-item[0], item[1]))[0][2] if candidates else None
+        identifiers = [name, identifier, str(metadata.get("target_id", "")), str(metadata.get("default_target_id", ""))]
+        if any("".join(ch for ch in value.lower() if ch.isalnum()) == wanted for value in identifiers):
+            candidates.append((folder.name, folder))
+    return sorted(candidates, key=lambda item: item[0])[0][1] if candidates else None
 
 
 def _base_target(slug: str | None = None) -> tuple[Path, dict[str, Any], Curve]:
-    folder = BASE_TARGET_ROOT / slug if slug else _default_target_folder()
-    if folder is None:
-        raise HTTPException(404, f"No repository target matches default identifier: {DEFAULT_BASE_TARGET}")
+    target_slug = slug
+    if target_slug:
+        if Path(target_slug).name != target_slug:
+            raise HTTPException(400, "Invalid Base Target selection")
+        folder = BASE_TARGET_ROOT / target_slug
+    else:
+        folder = _default_target_folder()
+        if folder is None:
+            raise HTTPException(404, f"No repository target matches default identifier: {DEFAULT_BASE_TARGET}")
     if not folder.is_dir():
-        raise HTTPException(404, f"Base Target not found: {target_slug}")
+        raise HTTPException(404, f"Base Target not found: {target_slug or folder.name}")
     metadata = _metadata(folder)
     target_file = folder / metadata.get("files", {}).get("target", "target.csv")
     if not target_file.exists():
-        raise HTTPException(422, f"Base Target has no prepared curve: {target_slug}")
-    return folder, metadata, _read_curve(target_file)
+        raise HTTPException(422, f"Base Target has no prepared curve: {folder.name}")
+    try:
+        curve = _read_curve(target_file)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(422, f"Base Target curve is invalid: {folder.name}") from exc
+    return folder, metadata, curve
 
 
 def _curve_payload(curve: Curve | None) -> dict[str, Any] | None:
