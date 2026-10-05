@@ -174,6 +174,8 @@ def v44_generate(payload: dict[str, Any]) -> dict[str, Any]:
     ids = payload.get("iem_ids") or []
     if not isinstance(ids, list) or not ids:
         raise HTTPException(400, "Select at least one IEM")
+    if len(set(ids)) != len(ids):
+        raise HTTPException(400, "Duplicate IEM identities cannot be separate votes")
     try:
         iems = [_iem(IEM_ROOT / item_id) for item_id in ids]
     except (OSError, ValueError) as exc:

@@ -86,7 +86,11 @@ class V44Result:
 
 def interpolate_log(f_src: np.ndarray, y_src: np.ndarray, f_dst: np.ndarray) -> np.ndarray:
     """Linear interpolation over log(f), with no extrapolation."""
-    if f_dst[0] < f_src[0] or f_dst[-1] > f_src[-1]:
+    # Prepared CSVs serialize the shared endpoint independently. Allow only
+    # that bounded decimal-rounding difference; np.interp still clamps at the
+    # endpoint and no mathematical extrapolation is performed.
+    tolerance = 1.0e-10 * max(1.0, abs(float(f_src[0])), abs(float(f_src[-1])), abs(float(f_dst[0])), abs(float(f_dst[-1])))
+    if f_dst[0] < f_src[0] - tolerance or f_dst[-1] > f_src[-1] + tolerance:
         raise ValueError("source curve does not cover destination grid")
     return np.interp(np.log(f_dst), np.log(f_src), y_src)
 

@@ -46,6 +46,23 @@ def test_v44_rejects_third_mode():
         raise AssertionError("third target mode was accepted")
 
 
+def test_v44_rejects_duplicate_iem_votes():
+    iem = v44_iems()["items"][0]["id"]
+    with __import__("pytest").raises(HTTPException) as duplicate:
+        v44_generate({"mode": "robust_target", "iem_ids": [iem, iem]})
+    assert duplicate.value.status_code == 400
+
+
+def test_v44_real_dataset_runs_all_nine_votes_to_spec_blocker():
+    ids = [item["id"] for item in v44_iems()["items"]]
+    assert len(ids) == 9
+    result = v44_generate({"mode": "robust_target", "iem_ids": ids})
+    assert result["iem_count"] == 9
+    assert result["selected_base_target"]["name"] == "Headphones.com IEM DF (B105 + 8 dB)"
+    assert result["final_target"] is None
+    assert result["delta_safe"] is None
+
+
 def test_default_target_resolution_is_exact_and_fail_closed(tmp_path, monkeypatch):
     import app.v44 as v44
     monkeypatch.setattr(v44, "BASE_TARGET_ROOT", tmp_path)
