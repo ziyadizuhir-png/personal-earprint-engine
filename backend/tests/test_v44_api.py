@@ -17,18 +17,19 @@ def test_v44_discovers_real_library_and_base_target():
     targets = v44_targets()["items"]
     assert iems
     assert all(item["has_prepared"] and item["has_preferred"] for item in iems)
-    assert not any(item["is_default"] for item in targets)
-    assert v44_status()["resolved_base_target"] is None
+    defaults = [item for item in targets if item["is_default"]]
+    assert len(defaults) == 1
+    assert defaults[0]["name"] == "Headphones.com IEM DF (B105 + 8 dB)"
+    assert v44_status()["resolved_base_target"] == "Headphones.com IEM DF (B105 + 8 dB)"
 
 
 def test_v44_generate_uses_selected_real_iem_and_keeps_final_pending():
     iem = v44_iems()["items"][0]["id"]
-    try:
-        v44_generate({"mode": "pure_earprint", "iem_ids": [iem]})
-    except HTTPException as exc:
-        assert exc.status_code == 404
-    else:
-        raise AssertionError("missing exact default target was silently resolved")
+    body = v44_generate({"mode": "pure_earprint", "iem_ids": [iem]})
+    assert body["mode"] == "pure_earprint"
+    assert body["final_target"] is None
+    assert body["delta_safe"] is None
+    assert body["base_target_info"]["name"] == "Headphones.com IEM DF (B105 + 8 dB)"
 
 
 def test_v44_rejects_third_mode():

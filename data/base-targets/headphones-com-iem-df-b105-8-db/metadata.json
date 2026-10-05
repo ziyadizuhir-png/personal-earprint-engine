@@ -1,0 +1,32 @@
+{
+  "name": "Headphones.com IEM DF (B105 + 8 dB)",
+  "slug": "headphones-com-iem-df-b105-8-db",
+  "kind": "base",
+  "status": "validated",
+  "files": {
+    "target": "target.csv",
+    "target_source": "target_source.txt",
+    "metadata": "metadata.json"
+  },
+  "target": {
+    "source_points": 480,
+    "prepared_points": 481,
+    "source_grid_contains_exact_1000_hz": false,
+    "prepared_grid_contains_exact_1000_hz": true,
+    "added_1000_hz_point": true,
+    "added_point_method": "log-frequency linear interpolation between adjacent source points",
+    "frequency_range_hz": [
+      20.0,
+      20186.382308152035
+    ]
+  },
+  "engine": {
+    "target_version": "V4.4-backbone",
+    "normalization_anchor_hz": 1000.0,
+    "mathematics_applied": false
+  },
+  "notes": "User-provided B105 8 dB Base Target",
+  "source_hashes": {
+    "target_source_sha256": "305bdc39d20104fa5fcf326370747888f80f6852192d3ed414cd654552a8ebe6"
+  }
+}
