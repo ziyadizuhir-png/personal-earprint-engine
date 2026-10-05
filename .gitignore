@@ -1,0 +1,10 @@
+# Runtime data is deployment state, not source-controlled application code.
+/data/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.env.*
+!.env.example
+frontend/.next/
+frontend/node_modules/
