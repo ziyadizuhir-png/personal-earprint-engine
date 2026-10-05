@@ -30,6 +30,10 @@ def test_v44_generate_uses_selected_real_iem_and_keeps_final_pending():
     assert body["final_target"] is None
     assert body["delta_safe"] is None
     assert body["base_target_info"]["name"] == "Headphones.com IEM DF (B105 + 8 dB)"
+    assert body["selected_base_target"]["slug"] == "headphones-com-iem-df-b105-8-db"
+    assert body["iem_count"] == 1
+    assert body["exact_1000_hz"] is True
+    assert "Delta Safe" in body["unresolved_stages"]
 
 
 def test_v44_rejects_third_mode():

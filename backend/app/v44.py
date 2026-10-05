@@ -112,6 +112,13 @@ def _curve_payload(curve: Curve | None) -> dict[str, Any] | None:
 def _result_payload(result, target_meta: dict[str, Any]) -> dict[str, Any]:
     data = result.to_dict()
     data["base_target_info"] = target_meta
+    data["selected_base_target"] = {
+        "name": target_meta.get("name"),
+        "slug": target_meta.get("slug"),
+    }
+    data["iem_count"] = len(data["per_iem"])
+    data["exact_1000_hz"] = True
+    data["unresolved_stages"] = ["G", "C", "Broad", "Local", "Feature Classification", "Delta Safe"]
     data["warnings"] = list(data["warnings"])
     actual_name = target_meta.get("name")
     if actual_name != DEFAULT_BASE_TARGET:
