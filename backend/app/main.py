@@ -9,9 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .ingest import ingest_iem, ingest_target
 from .storage import BASE_TARGET_ROOT, IEM_ROOT, TARGET_ROOT, ensure_data_dirs, storage_info
+from .v44 import router as v44_router
 
 ensure_data_dirs()
 app = FastAPI(title="Personal Earprint Engine API", version="0.2.0-backbone")
+app.include_router(v44_router)
 
 
 def configured_origins() -> list[str]:

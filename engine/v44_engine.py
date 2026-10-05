@@ -187,6 +187,10 @@ def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "r
     n_minus = np.sum(matrix < -ConsensusEpsilonDb, axis=0).astype(int).tolist()
     n_zero = np.sum(np.abs(matrix) <= ConsensusEpsilonDb, axis=0).astype(int).tolist()
     result = V44Result(mode, bf.tolist(), _curve(bf, by), _curve(bf, bn), per_iem, {k: _curve(bf, v) for k, v in zip([x.id for x in iems], deltas)}, _curve(bf, median), _curve(bf, mad), n_plus, n_minus, n_zero)
+    for curves in result.per_iem.values():
+        measured = np.asarray(curves["normalized_measured_fr"].level_db)
+        desired = np.asarray(curves["desired_response"].level_db)
+        curves["original_preferred_correction"] = _curve(bf, desired - measured)
     if delta_safe is None:
         result.warnings.append("G, C, Broad, Local, Feature Classification, and Delta Safe formulas are not locked in V4.4; final target is intentionally pending.")
     else:
@@ -195,7 +199,5 @@ def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "r
         final = np.asarray(result.final_target.level_db)
         for curves in result.per_iem.values():
             measured = np.asarray(curves["normalized_measured_fr"].level_db)
-            desired = np.asarray(curves["desired_response"].level_db)
             curves["required_correction"] = _curve(bf, final - measured)
-            curves["original_preferred_correction"] = _curve(bf, desired - measured)
     return result
