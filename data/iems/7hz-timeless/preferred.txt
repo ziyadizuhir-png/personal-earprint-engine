@@ -1,0 +1,16 @@
+# SoundEQ Dore
+# Device: 7Hz Timeless
+# Generated: 2026-09-14T23:49:57.878Z
+
+Filter 1: ON PK Fc 1059 Hz Gain -1.8 dB Q 4.94
+Filter 2: ON PK Fc 1260 Hz Gain -1.5 dB Q 2.08
+Filter 3: ON PK Fc 1682 Hz Gain 2.5 dB Q 1.05
+Filter 4: ON PK Fc 2245 Hz Gain -3.3 dB Q 1.90
+Filter 5: ON PK Fc 3175 Hz Gain -0.7 dB Q 3.80
+Filter 6: ON PK Fc 5040 Hz Gain -0.9 dB Q 4.72
+Filter 7: ON PK Fc 5823 Hz Gain -7.5 dB Q 5.16
+Filter 8: ON PK Fc 6536 Hz Gain -3.8 dB Q 3.42
+Filter 9: ON PK Fc 7127 Hz Gain 1.6 dB Q 6.44
+Filter 10: ON PK Fc 8000 Hz Gain 6.0 dB Q 5.82
+Filter 11: ON PK Fc 10679 Hz Gain 2.4 dB Q 1.31
+Filter 12: ON PK Fc 11986 Hz Gain 9.0 dB Q 6.42

@@ -1,0 +1,40 @@
+{
+  "name": "7Hz Timeless",
+  "slug": "7hz-timeless",
+  "status": "validated",
+  "files": {
+    "measurement": "measurement.csv",
+    "measurement_source": "measurement_source.txt",
+    "preferred": "preferred.txt",
+    "metadata": "metadata.json"
+  },
+  "measurement": {
+    "source_points": 480,
+    "prepared_points": 481,
+    "source_grid_contains_exact_1000_hz": false,
+    "prepared_grid_contains_exact_1000_hz": true,
+    "added_1000_hz_point": true,
+    "added_point_method": "log-frequency linear interpolation between adjacent source points",
+    "frequency_range_hz": [
+      20.0,
+      20186.382308152035
+    ]
+  },
+  "preferred": {
+    "non_empty": true,
+    "contains_supported_filter_type": true,
+    "source_format": "SoundEQ Dore / simplified filter text",
+    "source": "SoundEQ Dore",
+    "sample_rate_hz_default": 48000
+  },
+  "engine": {
+    "target_version": "V4.4",
+    "normalization_anchor_hz": 1000.0,
+    "grid_policy": "Base Target grid will be the Master Grid during target generation."
+  },
+  "notes": "",
+  "source_hashes": {
+    "measurement_source_sha256": "29168d6e69d2ca56430a1466487c009cf9be7e729c4c70dd2f157b6b78829b5b",
+    "preferred_sha256": "744e89355751f77be35e45064d98c2cf677f3269ccaa2fa2f094a87c4d10e6d5"
+  }
+}

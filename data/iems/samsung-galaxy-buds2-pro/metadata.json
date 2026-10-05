@@ -1,0 +1,40 @@
+{
+  "name": "Samsung Galaxy Buds2 Pro",
+  "slug": "samsung-galaxy-buds2-pro",
+  "status": "validated",
+  "files": {
+    "measurement": "measurement.csv",
+    "measurement_source": "measurement_source.txt",
+    "preferred": "preferred.txt",
+    "metadata": "metadata.json"
+  },
+  "measurement": {
+    "source_points": 480,
+    "prepared_points": 481,
+    "source_grid_contains_exact_1000_hz": false,
+    "prepared_grid_contains_exact_1000_hz": true,
+    "added_1000_hz_point": true,
+    "added_point_method": "log-frequency linear interpolation between adjacent source points",
+    "frequency_range_hz": [
+      20.0,
+      20186.382308
+    ]
+  },
+  "preferred": {
+    "non_empty": true,
+    "contains_supported_filter_type": true,
+    "source_format": "SoundEQ Dore / simplified filter text",
+    "source": "SoundEQ Dore",
+    "sample_rate_hz_default": 48000
+  },
+  "engine": {
+    "target_version": "V4.4",
+    "normalization_anchor_hz": 1000.0,
+    "grid_policy": "Base Target grid will be the Master Grid during target generation."
+  },
+  "notes": "",
+  "source_hashes": {
+    "measurement_source_sha256": "524736a56cac382b990905e97508357af6c16e54afc1bbc419ffaded9e99062f",
+    "preferred_sha256": "f688fd626d7a6f2daa90dbde8a5c9dac852d196e7ffa6ce1b197ba8c6eb11eb9"
+  }
+}

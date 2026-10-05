@@ -1,0 +1,40 @@
+{
+  "name": "ROSESELSA Ceramics Ultra",
+  "slug": "roseselsa-ceramics-ultra",
+  "status": "validated",
+  "files": {
+    "measurement": "measurement.csv",
+    "measurement_source": "measurement_source.txt",
+    "preferred": "preferred.txt",
+    "metadata": "metadata.json"
+  },
+  "measurement": {
+    "source_points": 480,
+    "prepared_points": 481,
+    "source_grid_contains_exact_1000_hz": false,
+    "prepared_grid_contains_exact_1000_hz": true,
+    "added_1000_hz_point": true,
+    "added_point_method": "log-frequency linear interpolation between adjacent source points",
+    "frequency_range_hz": [
+      20.0,
+      20186.382308
+    ]
+  },
+  "preferred": {
+    "non_empty": true,
+    "contains_supported_filter_type": true,
+    "source_format": "SoundEQ Dore / simplified filter text",
+    "source": "SoundEQ Dore",
+    "sample_rate_hz_default": 48000
+  },
+  "engine": {
+    "target_version": "V4.4",
+    "normalization_anchor_hz": 1000.0,
+    "grid_policy": "Base Target grid will be the Master Grid during target generation."
+  },
+  "notes": "",
+  "source_hashes": {
+    "measurement_source_sha256": "9d4191509416d4737e3cd1746b83c4532df6a4557963a61e8c53f4f6fa3ce522",
+    "preferred_sha256": "87bdcbd34966d458e87b74e9a6bebdac28e34e235e2a232de14441a119075a35"
+  }
+}

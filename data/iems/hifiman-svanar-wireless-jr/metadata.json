@@ -1,0 +1,40 @@
+{
+  "name": "HIFIMAN Svanar Wireless Jr",
+  "slug": "hifiman-svanar-wireless-jr",
+  "status": "validated",
+  "files": {
+    "measurement": "measurement.csv",
+    "measurement_source": "measurement_source.txt",
+    "preferred": "preferred.txt",
+    "metadata": "metadata.json"
+  },
+  "measurement": {
+    "source_points": 480,
+    "prepared_points": 481,
+    "source_grid_contains_exact_1000_hz": false,
+    "prepared_grid_contains_exact_1000_hz": true,
+    "added_1000_hz_point": true,
+    "added_point_method": "log-frequency linear interpolation between adjacent source points",
+    "frequency_range_hz": [
+      20.0,
+      20186.382308152035
+    ]
+  },
+  "preferred": {
+    "non_empty": true,
+    "contains_supported_filter_type": true,
+    "source_format": "SoundEQ Dore / simplified filter text",
+    "source": "SoundEQ Dore",
+    "sample_rate_hz_default": 48000
+  },
+  "engine": {
+    "target_version": "V4.4",
+    "normalization_anchor_hz": 1000.0,
+    "grid_policy": "Base Target grid will be the Master Grid during target generation."
+  },
+  "notes": "",
+  "source_hashes": {
+    "measurement_source_sha256": "3a638de0ff4e3089e628fd0763e68d3df0c7a274e19350cdd26092686e721d2b",
+    "preferred_sha256": "44e838e9f03f55ef3a6a1be3a0b07320b0ed22f01f7ec5c54d9de729428987cc"
+  }
+}

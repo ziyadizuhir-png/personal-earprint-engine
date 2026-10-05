@@ -1,0 +1,40 @@
+{
+  "name": "7Hz Salnotes Zero 2",
+  "slug": "7hz-salnotes-zero-2",
+  "status": "validated",
+  "files": {
+    "measurement": "measurement.csv",
+    "measurement_source": "measurement_source.txt",
+    "preferred": "preferred.txt",
+    "metadata": "metadata.json"
+  },
+  "measurement": {
+    "source_points": 480,
+    "prepared_points": 481,
+    "source_grid_contains_exact_1000_hz": false,
+    "prepared_grid_contains_exact_1000_hz": true,
+    "added_1000_hz_point": true,
+    "added_point_method": "log-frequency linear interpolation between adjacent source points",
+    "frequency_range_hz": [
+      20.0,
+      20186.382308152035
+    ]
+  },
+  "preferred": {
+    "non_empty": true,
+    "contains_supported_filter_type": true,
+    "source_format": "SoundEQ Dore / simplified filter text",
+    "source": "SoundEQ Dore",
+    "sample_rate_hz_default": 48000
+  },
+  "engine": {
+    "target_version": "V4.4",
+    "normalization_anchor_hz": 1000.0,
+    "grid_policy": "Base Target grid will be the Master Grid during target generation."
+  },
+  "notes": "",
+  "source_hashes": {
+    "measurement_source_sha256": "306e7bf134c9c4c2e30ff30a573b75885089b09be1b0cbca6994b53c498a234f",
+    "preferred_sha256": "a70e0372e3ccc3fc5f4fdab811339f6e7f0f048ac4e7e0983ff21015392aba27"
+  }
+}
