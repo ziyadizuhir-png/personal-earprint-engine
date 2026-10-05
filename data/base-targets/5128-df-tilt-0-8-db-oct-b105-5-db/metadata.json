@@ -1,0 +1,32 @@
+{
+  "name": "5128 DF (Tilt -0.8 dB/oct, B105 5 dB)",
+  "slug": "5128-df-tilt-0-8-db-oct-b105-5-db",
+  "kind": "base",
+  "status": "validated",
+  "files": {
+    "target": "target.csv",
+    "target_source": "target_source.txt",
+    "metadata": "metadata.json"
+  },
+  "target": {
+    "source_points": 480,
+    "prepared_points": 481,
+    "source_grid_contains_exact_1000_hz": false,
+    "prepared_grid_contains_exact_1000_hz": true,
+    "added_1000_hz_point": true,
+    "added_point_method": "log-frequency linear interpolation between adjacent source points",
+    "frequency_range_hz": [
+      20.0,
+      20186.382308152035
+    ]
+  },
+  "engine": {
+    "target_version": "V4.4-backbone",
+    "normalization_anchor_hz": 1000.0,
+    "mathematics_applied": false
+  },
+  "notes": "",
+  "source_hashes": {
+    "target_source_sha256": "a20bd4f38567c351956e83bbb54b0dc74d9f1029a320e6bc15375f157d6b1a7c"
+  }
+}

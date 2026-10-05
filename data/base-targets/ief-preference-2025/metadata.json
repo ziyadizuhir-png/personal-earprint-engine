@@ -1,0 +1,32 @@
+{
+  "name": "IEF Preference 2025",
+  "slug": "ief-preference-2025",
+  "kind": "base",
+  "status": "validated",
+  "files": {
+    "target": "target.csv",
+    "target_source": "target_source.txt",
+    "metadata": "metadata.json"
+  },
+  "target": {
+    "source_points": 480,
+    "prepared_points": 481,
+    "source_grid_contains_exact_1000_hz": false,
+    "prepared_grid_contains_exact_1000_hz": true,
+    "added_1000_hz_point": true,
+    "added_point_method": "log-frequency linear interpolation between adjacent source points",
+    "frequency_range_hz": [
+      20.0,
+      20186.382308152035
+    ]
+  },
+  "engine": {
+    "target_version": "V4.4-backbone",
+    "normalization_anchor_hz": 1000.0,
+    "mathematics_applied": false
+  },
+  "notes": "",
+  "source_hashes": {
+    "target_source_sha256": "32f46b17380b6a0257711c16d50fdc40d0f3546e80dc838f6277fe10836ddf7c"
+  }
+}
