@@ -1,5 +1,12 @@
 # Runtime data is deployment state, not source-controlled application code.
-/data/
+/data/*
+!/data/README.md
+!/data/iems/
+!/data/iems/.gitkeep
+!/data/base-targets/
+!/data/base-targets/.gitkeep
+!/data/targets/
+!/data/targets/.gitkeep
 **/__pycache__/
 *.py[cod]
 .pytest_cache/
