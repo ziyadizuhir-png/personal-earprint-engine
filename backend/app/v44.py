@@ -147,8 +147,8 @@ def v44_status() -> dict[str, Any]:
         "normalization_anchor_hz": NORMALIZATION_HZ,
         "sample_rate_hz_default": DEFAULT_SAMPLE_RATE,
         "consensus_epsilon_db": CONSENSUS_EPSILON_DB,
-        "unlocked_stages": ["G", "C", "Delta Safe"],
-        "spec_blocked_stages": ["Broad", "Local", "Feature Classification"],
+        "unlocked_stages": ["G", "C", "Broad", "Local", "Delta Safe"],
+        "spec_blocked_stages": ["Feature Classification"],
         "warnings": [] if metadata.get("name") == DEFAULT_BASE_TARGET else ["Requested default target identifier is not currently represented by the stored target metadata."],
     }
 

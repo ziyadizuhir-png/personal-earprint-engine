@@ -33,7 +33,9 @@ def test_v44_generate_uses_selected_real_iem():
     assert body["selected_base_target"]["slug"] == "jm-1-df-tilt-0-8-db-oct-b105-5-db"
     assert body["iem_count"] == 1
     assert body["exact_1000_hz"] is True
-    assert "Broad" in body["unresolved_stages"]
+    assert "Broad" not in body["unresolved_stages"]
+    assert "Local" not in body["unresolved_stages"]
+    assert "Feature Classification" in body["unresolved_stages"]
 
 
 def test_v44_rejects_third_mode():
@@ -53,7 +55,7 @@ def test_v44_rejects_duplicate_iem_votes():
     assert duplicate.value.status_code == 400
 
 
-def test_v44_real_dataset_runs_all_nine_votes_to_spec_blocker():
+def test_v44_real_dataset_runs_all_nine_votes():
     ids = [item["id"] for item in v44_iems()["items"]]
     assert len(ids) == 9
     result = v44_generate({"mode": "robust_target", "iem_ids": ids})

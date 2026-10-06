@@ -1,5 +1,5 @@
 import numpy as np
-from engine.v44_engine import Curve, IEMInput, PEQFilter, construct_target, generate, parse_peq, reconstruct_peq
+from engine.v44_engine import Curve, IEMInput, PEQFilter, apply_local_safety, construct_target, generate, huber_center, parse_peq, reconstruct_peq
 
 def curve(f, y): return Curve(f.tolist(), y.tolist())
 
@@ -53,3 +53,20 @@ def test_v44_inputs_require_exact_1000_hz_anchor():
         assert "exact 1000 Hz" in str(exc)
     else:
         raise AssertionError("unprepared V4.4 input was accepted")
+
+
+def test_personal_formula_huber_and_local_safety_are_production_stages():
+    f, base, iem = fixture()
+    result = generate(base, [iem])
+    anchor = result.master_grid_hz.index(1000.0)
+    assert result.personal_delta["x"].level_db[anchor] == 0.0
+    assert result.median_delta.level_db[anchor] == 0.0
+    assert result.mad.level_db[anchor] == 0.0
+    assert result.stage_status["Delta Safe"].startswith("IMPLEMENTED")
+    assert result.stage_status["Broad"].startswith("IMPLEMENTED")
+    assert result.stage_status["Local"].startswith("IMPLEMENTED")
+    assert result.stage_status["Feature Classification"].startswith("SPEC_BLOCKED")
+    assert np.isclose(huber_center(np.array([[0.0, 1.0], [0.0, 3.0]]), c=1.345)[0], 0.0)
+    safety = apply_local_safety(np.array([8127.5, 1000.0]), np.array([1.0, 1.0]))
+    assert np.isclose(safety[0], 0.55)
+    assert safety[1] > 0.99

@@ -1,9 +1,10 @@
-"""Locked, auditable V4.4 Earprint calculations.
+"""Auditable Personal Earprint Robust Target calculations.
 
 This module deliberately does not import the legacy engine.  V4.4 owns its
-master grid, 1 kHz anchor, PEQ reconstruction, and two-mode target contract.
-The robustness/classification formulas not present in the V4.4 specification
-are typed extension points and remain unresolved instead of being guessed.
+master grid, 1 kHz anchor, PEQ reconstruction, and Robust Target contract.
+Feature Classification remains an explicit extension point because its
+qualitative categories and thresholds are not defined by the production
+formula. All numeric Robust Target stages implemented here are canonical.
 """
 from __future__ import annotations
 
@@ -172,14 +173,31 @@ def construct_target(base: Curve, delta_safe: Curve) -> Curve:
     handoff = (f >= 12000.0) & (f < 14000.0)
     t = np.clip((f - 12000.0) / 2000.0, 0.0, 1.0)
     # Cubic Hermite: value and left slope are preserved at 12 kHz; zero at 14 kHz.
-    left_slope = np.gradient(d, np.log(f))
+    left_slope = np.gradient(d, f)
     d12 = np.interp(np.log(12000.0), np.log(f), d)
     s12 = np.interp(np.log(12000.0), np.log(f), left_slope)
-    span = np.log(14000.0) - np.log(12000.0)
+    span = 2000.0
     h00 = 2*t**3 - 3*t**2 + 1
     h10 = t**3 - 2*t**2 + t
     handoff_delta = h00*d12 + h10*span*s12
     return _curve(f, b + np.where(handoff, handoff_delta, d * w))
+
+
+def analyze_broad_local(frequency_hz: np.ndarray, robust_delta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Deterministic approximately 1/12-octave broad/local diagnostic split."""
+    log_frequency = np.log2(frequency_hz)
+    broad = np.empty_like(robust_delta, dtype=float)
+    half_window = 1.0 / 24.0
+    for index, center in enumerate(log_frequency):
+        mask = np.abs(log_frequency - center) <= half_window
+        broad[index] = float(np.mean(robust_delta[mask]))
+    return broad, robust_delta - broad
+
+
+def apply_local_safety(frequency_hz: np.ndarray, delta: np.ndarray) -> np.ndarray:
+    """Apply the specified local 8.13 kHz safety factor only."""
+    bump = np.exp(-0.5 * (np.log2(frequency_hz / 8127.5) / 0.16) ** 2)
+    return delta * (1.0 - 0.45 * bump)
 
 
 def huber_center(matrix: np.ndarray, c: float = 1.345, floor_db: float = 1.0e-6, max_iter: int = 50) -> np.ndarray:
@@ -191,7 +209,8 @@ def huber_center(matrix: np.ndarray, c: float = 1.345, floor_db: float = 1.0e-6,
         residual = matrix - mu
         k = c * scale
         abs_residual = np.abs(residual)
-        weights = np.where(abs_residual == 0.0, 1.0, np.minimum(1.0, k / abs_residual))
+        ratio = np.divide(k, abs_residual, out=np.zeros_like(abs_residual), where=abs_residual != 0.0)
+        weights = np.where(abs_residual <= k, 1.0, ratio)
         next_mu = np.sum(weights * matrix, axis=0) / np.sum(weights, axis=0)
         if np.max(np.abs(next_mu - mu)) <= 1.0e-10:
             return next_mu
@@ -239,17 +258,21 @@ def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "r
         curves["original_preferred_correction"] = _curve(bf, desired - measured)
     robust = huber_center(matrix)
     result.robust_delta = _curve(bf, robust)
-    result.delta_safe = delta_safe or result.robust_delta
+    broad, local = analyze_broad_local(bf, robust)
+    result.broad = _curve(bf, broad)
+    result.local = _curve(bf, local)
+    safe_values = apply_local_safety(bf, robust)
+    result.delta_safe = delta_safe or _curve(bf, safe_values)
     result.final_target = construct_target(base_target, result.delta_safe)
     result.stage_status = {
         "G": "IMPLEMENTED",
         "C": "IMPLEMENTED; undefined at frequencies with Nactive=0",
-        "Broad": "SPEC_BLOCKED: smooth operator and exact 1/12-octave implementation are not numerically defined",
-        "Local": "SPEC_BLOCKED: depends on BroadShape",
+        "Broad": "IMPLEMENTED_DIAGNOSTIC: approximately 1/12-octave local mean",
+        "Local": "IMPLEMENTED_DIAGNOSTIC: RobustDelta - Broad",
         "Feature Classification": "SPEC_BLOCKED: qualitative rules lack executable thresholds/categories",
-        "Delta Safe": "IMPLEMENTED_DEFAULT: Delta_safe = Delta_median; local safety edits not applied",
+        "Delta Safe": "IMPLEMENTED: local 8.13 kHz safety factor",
     }
-    result.warnings.append("Broad/Local/Feature Classification local analysis remains specification-blocked; Delta Safe uses the locked default Delta_median without local edits.")
+    result.warnings.append("Feature Classification remains specification-blocked; Broad and Local are diagnostics and Delta Safe applies only the specified local 8.13 kHz safety factor.")
     final = np.asarray(result.final_target.level_db)
     for curves in result.per_iem.values():
         measured = np.asarray(curves["normalized_measured_fr"].level_db)

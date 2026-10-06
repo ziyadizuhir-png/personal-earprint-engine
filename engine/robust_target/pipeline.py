@@ -1,7 +1,7 @@
-"""Stable production facade over the locked robust-target mathematics."""
+"""Stable production facade over the canonical Robust Target mathematics."""
 from __future__ import annotations
 
-from engine.v44.v44 import *  # noqa: F401,F403 - compatibility facade for the frozen math
+from engine.v44.v44 import *  # noqa: F401,F403 - one canonical implementation
 
 
 def generate_robust_target(base_target: Curve, iems: Sequence[IEMInput], sample_rate_hz: float = 48000.0) -> V44Result:
