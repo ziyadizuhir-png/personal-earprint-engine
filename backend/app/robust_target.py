@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from engine.robust_target import generate_robust_target
 from engine.v44.v44 import Curve, IEMInput
 from .storage import BASE_TARGET_ROOT, IEM_ROOT, storage_info
-from .v44 import _base_target, _iem
+from .v44 import _base_target, _default_target_folder, _iem
 
 router = APIRouter(prefix="/api", tags=["robust-target"])
 
@@ -21,7 +21,11 @@ def engine_status() -> dict:
 @router.get("/base-targets")
 def base_targets() -> dict:
     from .main import list_collection
-    return {"items": list_collection(BASE_TARGET_ROOT, "base-targets")}
+    default_folder = _default_target_folder()
+    items = list_collection(BASE_TARGET_ROOT, "base-targets")
+    for item in items:
+        item["is_default"] = default_folder is not None and item["slug"] == default_folder.name
+    return {"items": items}
 
 
 @router.get("/robust-targets")

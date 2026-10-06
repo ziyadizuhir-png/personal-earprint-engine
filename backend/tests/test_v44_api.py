@@ -19,8 +19,8 @@ def test_v44_discovers_real_library_and_base_target():
     assert all(item["has_prepared"] and item["has_preferred"] for item in iems)
     defaults = [item for item in targets if item["is_default"]]
     assert len(defaults) == 1
-    assert defaults[0]["name"] == "Headphones.com IEM DF (B105 + 8 dB)"
-    assert v44_status()["resolved_base_target"] == "Headphones.com IEM DF (B105 + 8 dB)"
+    assert defaults[0]["name"] == "JM-1 DF (Tilt -0.8 dB/oct, B105 5 dB)"
+    assert v44_status()["resolved_base_target"] == "JM-1 DF (Tilt -0.8 dB/oct, B105 5 dB)"
 
 
 def test_v44_generate_uses_selected_real_iem():
@@ -29,7 +29,7 @@ def test_v44_generate_uses_selected_real_iem():
     assert body["mode"] == "robust_target"
     assert body["final_target"] is not None
     assert body["delta_safe"] is not None
-    assert body["base_target_info"]["name"] == "Headphones.com IEM DF (B105 + 8 dB)"
+    assert body["base_target_info"]["name"] == "JM-1 DF (Tilt -0.8 dB/oct, B105 5 dB)"
     assert body["selected_base_target"]["slug"] == "headphones-com-iem-df-b105-8-db"
     assert body["iem_count"] == 1
     assert body["exact_1000_hz"] is True
@@ -58,7 +58,7 @@ def test_v44_real_dataset_runs_all_nine_votes_to_spec_blocker():
     assert len(ids) == 9
     result = v44_generate({"mode": "robust_target", "iem_ids": ids})
     assert result["iem_count"] == 9
-    assert result["selected_base_target"]["name"] == "Headphones.com IEM DF (B105 + 8 dB)"
+    assert result["selected_base_target"]["name"] == "JM-1 DF (Tilt -0.8 dB/oct, B105 5 dB)"
     assert result["final_target"] is not None
     assert result["delta_safe"] is not None
 
@@ -75,7 +75,7 @@ def test_default_target_resolution_is_exact_and_fail_closed(tmp_path, monkeypatc
     assert missing.value.status_code == 404
     exact = tmp_path / "exact"
     exact.mkdir()
-    (exact / "metadata.json").write_text(json.dumps({"name": "Headphones.com IEM DF (B105 + 8 dB)", "files": {"target": "target.csv"}}), encoding="utf-8")
+    (exact / "metadata.json").write_text(json.dumps({"name": "JM-1 DF (Tilt -0.8 dB/oct, B105 5 dB)", "files": {"target": "target.csv"}}), encoding="utf-8")
     (exact / "target.csv").write_text("freq,db\n20,0\n1000,0\n14000,0\n20000,0\n", encoding="utf-8")
     assert _default_target_folder() == exact
     assert _base_target()[0] == exact
