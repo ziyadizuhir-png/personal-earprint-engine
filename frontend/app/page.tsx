@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Check, ChevronDown, Download, Headphones, Loader2, Plus, Upload, Wifi, WifiOff } from "lucide-react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-const API = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
+const API = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
 type Curve = { frequency_hz: number[]; level_db: number[] } | null;
 type IEM = { name: string; slug: string; status: string; has_measurement: boolean; has_preferred: boolean; has_metadata: boolean };
 type Target = { name: string; slug: string; kind?: string; status: string; collection: string; has_prepared: boolean; has_source: boolean; has_metadata: boolean };

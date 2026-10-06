@@ -80,6 +80,22 @@ npm run build
 
 GitHub Actions runs the same backend checks and frontend build on pushes and pull requests.
 
+## GitHub Pages
+
+The frontend is exported and deployed automatically from `main` using
+`.github/workflows/pages.yml`.
+
+Production URL:
+
+<https://ziyadizuhir-png.github.io/personal-earprint-engine/>
+
+The static shell is available on GitHub Pages. Live IEM/Target Library data,
+uploads, health checks, and Robust Target generation still require the FastAPI
+backend. Set `NEXT_PUBLIC_API_URL` to the externally hosted backend URL when
+building the frontend; no production backend URL is assumed by this repository.
+For local development, use `http://localhost:8000` as documented in
+`frontend/.env.example` and run the backend separately.
+
 ## Data layout
 
 ```text
