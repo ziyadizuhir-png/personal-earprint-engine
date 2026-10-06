@@ -96,6 +96,14 @@ building the frontend; no production backend URL is assumed by this repository.
 For local development, use `http://localhost:8000` as documented in
 `frontend/.env.example` and run the backend separately.
 
+The repository includes `render.yaml` for a Render Docker Web Service. Mount a
+persistent disk at `/data` and configure `DATA_ROOT=/data`,
+`STORAGE_BACKEND=filesystem`, and
+`CORS_ORIGINS=https://ziyadizuhir-png.github.io`. After Render provides the
+HTTPS service URL, set the GitHub repository variable `NEXT_PUBLIC_API_URL` and
+rerun the Pages deployment. GitHub Pages cannot run FastAPI or provide
+persistent storage.
+
 ## Data layout
 
 ```text

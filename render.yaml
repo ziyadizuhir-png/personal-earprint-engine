@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: personal-earprint-engine-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: STORAGE_BACKEND
+        value: filesystem
+      - key: DATA_ROOT
+        value: /data
+      - key: CORS_ORIGINS
+        value: https://ziyadizuhir-png.github.io
+    disk:
+      name: earprint-data
+      mountPath: /data
+      sizeGB: 1
