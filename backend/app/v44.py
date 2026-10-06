@@ -16,6 +16,7 @@ from engine.v44.constants import (
 )
 
 from .storage import BASE_TARGET_ROOT, IEM_ROOT, discover_collection
+from . import storage as _storage
 
 router = APIRouter(prefix="/api/v44", tags=["v44"])
 
@@ -70,7 +71,12 @@ def _iem(folder: Path) -> IEMInput:
 def _default_target_folder() -> Path | None:
     candidates: list[tuple[str, Path]] = []
     wanted = "".join(ch for ch in DEFAULT_BASE_TARGET.lower() if ch.isalnum())
-    for folder in discover_collection("base-targets"):
+    # Tests and callers may replace BASE_TARGET_ROOT. In that case it is an
+    # explicit authority and must be inspected fail-closed, without bundled
+    # repository fallback. Normal production uses the storage discovery merge.
+    roots = [BASE_TARGET_ROOT] if BASE_TARGET_ROOT != _storage.BASE_TARGET_ROOT else discover_collection("base-targets")
+    folders = [folder for root in roots if root.exists() for folder in sorted(root.iterdir())]
+    for folder in folders:
         if not folder.is_dir():
             continue
         metadata = _metadata(folder)
