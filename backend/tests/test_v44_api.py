@@ -4,11 +4,11 @@ from fastapi import HTTPException
 import json
 
 
-def test_v44_routes_are_attached_and_status_is_two_mode_only():
+def test_routes_are_attached_and_legacy_status_has_no_pure_mode():
     paths = set(app.openapi()["paths"])
     assert {"/api/v44/status", "/api/v44/iems", "/api/v44/targets", "/api/v44/generate", "/api/v44/validate"} <= paths
     body = v44_status()
-    assert body["target_modes"] == ["robust_target", "pure_earprint"]
+    assert body["target_modes"] == ["robust_target"]
     assert "Hybrid Graph" not in body["target_modes"]
 
 
@@ -23,10 +23,10 @@ def test_v44_discovers_real_library_and_base_target():
     assert v44_status()["resolved_base_target"] == "Headphones.com IEM DF (B105 + 8 dB)"
 
 
-def test_v44_generate_uses_selected_real_iem_and_keeps_final_pending():
+def test_v44_generate_uses_selected_real_iem():
     iem = v44_iems()["items"][0]["id"]
-    body = v44_generate({"mode": "pure_earprint", "iem_ids": [iem]})
-    assert body["mode"] == "pure_earprint"
+    body = v44_generate({"mode": "robust_target", "iem_ids": [iem]})
+    assert body["mode"] == "robust_target"
     assert body["final_target"] is not None
     assert body["delta_safe"] is not None
     assert body["base_target_info"]["name"] == "Headphones.com IEM DF (B105 + 8 dB)"

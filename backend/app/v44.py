@@ -132,7 +132,7 @@ def v44_status() -> dict[str, Any]:
     metadata = _metadata(folder) if folder else {}
     return {
         "version": "4.4",
-        "target_modes": ["robust_target", "pure_earprint"],
+        "target_modes": ["robust_target"],
         "default_target": DEFAULT_BASE_TARGET,
         "resolved_base_target": metadata.get("name"),
         "normalization_anchor_hz": NORMALIZATION_HZ,
@@ -170,8 +170,8 @@ def v44_targets() -> dict[str, Any]:
 @router.post("/generate")
 def v44_generate(payload: dict[str, Any]) -> dict[str, Any]:
     mode = payload.get("mode", "robust_target")
-    if mode not in {"robust_target", "pure_earprint"}:
-        raise HTTPException(400, "V4.4 target mode must be robust_target or pure_earprint")
+    if mode != "robust_target":
+        raise HTTPException(400, "Only the Robust Target production contract is supported")
     ids = payload.get("iem_ids") or []
     if not isinstance(ids, list) or not ids:
         raise HTTPException(400, "Select at least one IEM")

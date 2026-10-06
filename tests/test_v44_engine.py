@@ -22,20 +22,25 @@ def test_master_grid_anchor_statistics_and_pending_stages():
     assert result.final_target is not None
     assert result.delta_safe is not None
 
-def test_frequency_ownership_and_exact_linear_fade():
+def test_frequency_ownership_and_c1_handoff():
     f, base, _ = fixture(); delta = curve(f, np.full_like(f, 2.0)); out = construct_target(base, delta)
     assert out.level_db[0] == base.level_db[0]
     assert out.level_db[1] == base.level_db[1] + 2
     assert out.level_db[2] == base.level_db[2] + 2
-    assert out.level_db[3] == base.level_db[3] + 2
-    assert out.level_db[4] == base.level_db[4] + 1
+    assert out.level_db[3] == base.level_db[3] + 1
+    assert out.level_db[4] > base.level_db[4]
     assert out.level_db[5] == base.level_db[5]
     assert out.level_db[6] == base.level_db[6]
 
-def test_raw_input_unchanged_and_modes_are_exactly_two():
+def test_raw_input_unchanged_and_only_robust_target_contract():
     f, base, iem = fixture(); before = list(iem.prepared_measurement.level_db)
-    assert generate(base, [iem], "pure_earprint").mode == "pure_earprint"
     assert generate(base, [iem], "robust_target").mode == "robust_target"
+    try:
+        generate(base, [iem], "pure_earprint")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("legacy Pure EarPrint mode was accepted")
     assert iem.prepared_measurement.level_db == before
 
 def test_v44_inputs_require_exact_1000_hz_anchor():

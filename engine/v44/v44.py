@@ -16,7 +16,7 @@ import numpy as np
 
 AnchorHz = 1000.0
 ConsensusEpsilonDb = 0.25
-TargetMode = Literal["robust_target", "pure_earprint"]
+TargetMode = Literal["robust_target"]
 
 
 @dataclass(frozen=True)
@@ -80,6 +80,7 @@ class V44Result:
     final_target: Curve | None = None
     stage_status: dict[str, str] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    robust_delta: Curve | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -162,17 +163,45 @@ def _curve(f: np.ndarray, y: np.ndarray) -> Curve:
 
 
 def construct_target(base: Curve, delta_safe: Curve) -> Curve:
-    """Apply only the locked V4.4 frequency ownership rules."""
+    """Apply the production ownership and C1 cubic-Hermite handoff."""
     f, b = base.array()
     fd, d = delta_safe.array()
     d = interpolate_log(fd, d, f)
-    w = np.where(f < 1000.0, 0.0, np.where(f <= 12000.0, 1.0, np.where(f < 14000.0, (14000.0 - f) / 2000.0, 0.0)))
-    return _curve(f, b + d * w)
+    # 1-10 kHz: full personal ownership; 10-12 kHz: half ownership.
+    w = np.where(f < 1000.0, 0.0, np.where(f < 10000.0, 1.0, np.where(f < 12000.0, 0.5, 0.0)))
+    handoff = (f >= 12000.0) & (f < 14000.0)
+    t = np.clip((f - 12000.0) / 2000.0, 0.0, 1.0)
+    # Cubic Hermite: value and left slope are preserved at 12 kHz; zero at 14 kHz.
+    left_slope = np.gradient(d, np.log(f))
+    d12 = np.interp(np.log(12000.0), np.log(f), d)
+    s12 = np.interp(np.log(12000.0), np.log(f), left_slope)
+    span = np.log(14000.0) - np.log(12000.0)
+    h00 = 2*t**3 - 3*t**2 + 1
+    h10 = t**3 - 2*t**2 + t
+    handoff_delta = h00*d12 + h10*span*s12
+    return _curve(f, b + np.where(handoff, handoff_delta, d * w))
+
+
+def huber_center(matrix: np.ndarray, c: float = 1.345, floor_db: float = 1.0e-6, max_iter: int = 50) -> np.ndarray:
+    """Deterministic pointwise Huber IRLS center, seeded by the median."""
+    mu = np.median(matrix, axis=0)
+    mad = np.median(np.abs(matrix - mu), axis=0)
+    scale = np.maximum(1.4826 * mad, floor_db)
+    for _ in range(max_iter):
+        residual = matrix - mu
+        k = c * scale
+        abs_residual = np.abs(residual)
+        weights = np.where(abs_residual == 0.0, 1.0, np.minimum(1.0, k / abs_residual))
+        next_mu = np.sum(weights * matrix, axis=0) / np.sum(weights, axis=0)
+        if np.max(np.abs(next_mu - mu)) <= 1.0e-10:
+            return next_mu
+        mu = next_mu
+    return mu
 
 
 def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "robust_target", sample_rate_hz: float = 48000.0, delta_safe: Curve | None = None) -> V44Result:
-    if mode not in {"robust_target", "pure_earprint"}:
-        raise ValueError("V4.4 has exactly two target modes")
+    if mode != "robust_target":
+        raise ValueError("production engine accepts only the Robust Target contract")
     bf, by = base_target.array()
     require_exact_1000_hz(bf, "Base Target")
     if bf[0] > 20 or bf[-1] < 14000:
@@ -208,7 +237,9 @@ def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "r
         measured = np.asarray(curves["normalized_measured_fr"].level_db)
         desired = np.asarray(curves["desired_response"].level_db)
         curves["original_preferred_correction"] = _curve(bf, desired - measured)
-    result.delta_safe = delta_safe or result.median_delta
+    robust = huber_center(matrix)
+    result.robust_delta = _curve(bf, robust)
+    result.delta_safe = delta_safe or result.robust_delta
     result.final_target = construct_target(base_target, result.delta_safe)
     result.stage_status = {
         "G": "IMPLEMENTED",

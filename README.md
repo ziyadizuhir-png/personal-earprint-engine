@@ -1,7 +1,9 @@
-# Personal Earprint Engine — Deployment-ready Backbone
+# Personal Earprint Engine — Dynamic Robust Target Engine
 
-Deployment-ready foundation for the Personal Earprint Engine V4.4 web app.
-This repository deliberately does **not** implement the locked V4.4 target-generation mathematics.
+The production engine converts a dynamic collection of IEM measurements and
+SoundEQ Dore preferences into one deterministic Robust Target curve. AutoEQ
+and other PEQ optimizers are downstream consumers; this engine does not
+generate device-specific PEQ output.
 
 ## Included now
 
@@ -16,9 +18,18 @@ This repository deliberately does **not** implement the locked V4.4 target-gener
 - Storage adapter boundary with configurable `DATA_ROOT`
 - Dockerfile for the backend and CI verification workflow
 
-## V4.4 scope boundary
+## Production API
 
-No formulas for G, C, Broad/Local separation, feature-classification thresholds, or Delta Safe thresholding are implemented here. Target uploads only validate and prepare the source data; `mathematics_applied` is explicitly recorded as `false`.
+- `GET /api/engine/status`
+- `GET /api/iems`
+- `GET /api/base-targets`
+- `POST /api/robust-targets/generate`
+
+Generation accepts `base_target_id` and an optional `iem_ids` list. The
+selected Base Target defines the master grid; the active dataset defines the
+votes. Each generation returns a canonical target hash and provenance summary.
+The legacy `/api/v44/*` routes are compatibility-only and do not expose a
+second production mathematical pipeline.
 
 ## Local development
 
@@ -62,6 +73,7 @@ No paid storage service is required by this backbone. If a deployment cannot pro
 ```bash
 python -m compileall backend/app
 pytest backend/tests
+pytest tests/test_v44_engine.py
 cd frontend
 npm run build
 ```
