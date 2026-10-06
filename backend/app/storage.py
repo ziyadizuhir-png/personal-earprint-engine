@@ -7,6 +7,7 @@ from typing import Protocol
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+BUNDLED_DATA_ROOT = PROJECT_ROOT / "data"
 
 
 def configured_data_root() -> Path:
@@ -76,6 +77,22 @@ DATA_ROOT = storage.root
 IEM_ROOT = storage.collection_root("iems")
 BASE_TARGET_ROOT = storage.collection_root("base-targets")
 TARGET_ROOT = storage.collection_root("targets")
+
+
+def discover_collection(collection: str) -> list[Path]:
+    """Discover persistent records first, then bundled repository records."""
+    roots = [storage.collection_root(collection)]
+    bundled = BUNDLED_DATA_ROOT / collection
+    if bundled != roots[0]:
+        roots.append(bundled)
+    found: dict[str, Path] = {}
+    for root in roots:
+        if not root.exists():
+            continue
+        for folder in sorted(root.iterdir()):
+            if folder.is_dir() and folder.name not in found:
+                found[folder.name] = folder
+    return [found[key] for key in sorted(found)]
 
 
 def slugify(value: str) -> str:

@@ -8,7 +8,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from .ingest import ingest_iem, ingest_target
-from .storage import BASE_TARGET_ROOT, IEM_ROOT, TARGET_ROOT, ensure_data_dirs, storage_info
+from .storage import BASE_TARGET_ROOT, IEM_ROOT, TARGET_ROOT, discover_collection, ensure_data_dirs, storage_info
 from .v44 import router as v44_router
 from .robust_target import router as robust_target_router
 
@@ -44,7 +44,8 @@ def read_metadata(folder: Path) -> dict:
 
 def list_collection(root: Path, collection_name: str) -> list[dict]:
     items = []
-    for folder in sorted(root.iterdir()) if root.exists() else []:
+    collection = "iems" if collection_name == "iems" else "base-targets" if collection_name == "base-targets" else "targets"
+    for folder in discover_collection(collection):
         if not folder.is_dir():
             continue
         metadata = read_metadata(folder)

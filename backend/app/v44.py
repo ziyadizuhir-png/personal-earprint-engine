@@ -15,7 +15,7 @@ from engine.v44.constants import (
     NORMALIZATION_HZ,
 )
 
-from .storage import BASE_TARGET_ROOT, IEM_ROOT
+from .storage import BASE_TARGET_ROOT, IEM_ROOT, discover_collection
 
 router = APIRouter(prefix="/api/v44", tags=["v44"])
 
@@ -70,7 +70,7 @@ def _iem(folder: Path) -> IEMInput:
 def _default_target_folder() -> Path | None:
     candidates: list[tuple[str, Path]] = []
     wanted = "".join(ch for ch in DEFAULT_BASE_TARGET.lower() if ch.isalnum())
-    for folder in sorted(BASE_TARGET_ROOT.iterdir()) if BASE_TARGET_ROOT.exists() else []:
+    for folder in discover_collection("base-targets"):
         if not folder.is_dir():
             continue
         metadata = _metadata(folder)
@@ -87,7 +87,7 @@ def _base_target(slug: str | None = None) -> tuple[Path, dict[str, Any], Curve]:
     if target_slug:
         if Path(target_slug).name != target_slug:
             raise HTTPException(400, "Invalid Base Target selection")
-        folder = BASE_TARGET_ROOT / target_slug
+        folder = next((item for item in discover_collection("base-targets") if item.name == target_slug), BASE_TARGET_ROOT / target_slug)
     else:
         folder = _default_target_folder()
         if folder is None:
@@ -147,7 +147,7 @@ def v44_status() -> dict[str, Any]:
 @router.get("/iems")
 def v44_iems() -> dict[str, Any]:
     items = []
-    for folder in sorted(IEM_ROOT.iterdir()) if IEM_ROOT.exists() else []:
+    for folder in discover_collection("iems"):
         if not folder.is_dir():
             continue
         metadata = _metadata(folder)
@@ -159,7 +159,7 @@ def v44_iems() -> dict[str, Any]:
 def v44_targets() -> dict[str, Any]:
     default_folder = _default_target_folder()
     items = []
-    for folder in sorted(BASE_TARGET_ROOT.iterdir()) if BASE_TARGET_ROOT.exists() else []:
+    for folder in discover_collection("base-targets"):
         if not folder.is_dir():
             continue
         metadata = _metadata(folder)
