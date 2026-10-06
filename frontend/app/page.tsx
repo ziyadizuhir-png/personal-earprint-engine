@@ -1,151 +1,54 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Activity, Check, ChevronDown, Download, Headphones, Loader2, Plus, Upload, Wifi, WifiOff } from "lucide-react";
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 const API = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
-
+type Curve = { frequency_hz: number[]; level_db: number[] } | null;
 type IEM = { name: string; slug: string; status: string; has_measurement: boolean; has_preferred: boolean; has_metadata: boolean };
 type Target = { name: string; slug: string; kind?: string; status: string; collection: string; has_prepared: boolean; has_source: boolean; has_metadata: boolean };
-type V44Curve = { frequency_hz: number[]; level_db: number[] } | null;
-type V44Result = { mode: string; base_target: V44Curve; normalized_base_target: V44Curve; per_iem: Record<string, Record<string, V44Curve>>; personal_delta: Record<string, V44Curve>; median_delta: V44Curve; mad: V44Curve; n_plus: number[]; n_minus: number[]; n_zero: number[]; G: V44Curve; C: V44Curve; broad: V44Curve; local: V44Curve; feature_classification: string[] | null; delta_safe: V44Curve; final_target: V44Curve; warnings: string[] };
+type Result = { mode: string; base_target: Curve; normalized_base_target: Curve; per_iem: Record<string, Record<string, Curve>>; personal_delta: Record<string, Curve>; median_delta: Curve; mad: Curve; n_plus: number[]; n_minus: number[]; n_zero: number[]; G: Curve; C: Curve; broad: Curve; local: Curve; feature_classification: string[] | null; delta_safe: Curve; final_target: Curve; warnings: string[]; selected_base_target?: { name?: string; slug?: string }; iem_count?: number };
 
-const cardStyle = { border: "1px solid #242424", borderRadius: 16, padding: 24, background: "#101010" };
-const inputStyle = { width: "100%", padding: 12, background: "#080808", color: "#fff", border: "1px solid #303030", borderRadius: 10 };
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label><div style={{ fontSize: 13, opacity: .7, marginBottom: 6 }}>{label}</div>{children}</label>;
-}
+const card = "rounded-2xl border border-zinc-800 bg-zinc-900";
+const input = "min-h-11 w-full rounded-xl border-zinc-700 bg-zinc-950 px-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-amber-400 focus:ring-amber-400";
+const stages = ["base_target", "normalized_base_target", "normalized_measured_fr", "reconstructed_peq", "normalized_peq", "desired_response", "personal_delta", "median_delta", "mad", "n_plus", "n_minus", "n_zero", "G", "C", "broad", "local", "feature_classification", "delta_safe", "final_target"];
 
 export default function Home() {
-  const [items, setItems] = useState<IEM[]>([]);
-  const [targets, setTargets] = useState<Target[]>([]);
-  const [name, setName] = useState("");
-  const [measurement, setMeasurement] = useState<File | null>(null);
-  const [preferred, setPreferred] = useState<File | null>(null);
-  const [notes, setNotes] = useState("");
-  const [targetName, setTargetName] = useState("");
-  const [targetFile, setTargetFile] = useState<File | null>(null);
-  const [targetKind, setTargetKind] = useState("base");
-  const [targetNotes, setTargetNotes] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [targetBusy, setTargetBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [targetMessage, setTargetMessage] = useState("");
-  const [v44Mode, setV44Mode] = useState<"robust_target" | "pure_earprint">("robust_target");
-  const [selectedV44, setSelectedV44] = useState<string[]>([]);
-  const [v44Result, setV44Result] = useState<V44Result | null>(null);
-  const [v44Busy, setV44Busy] = useState(false);
-  const [v44Message, setV44Message] = useState("");
-  const [visibleStages, setVisibleStages] = useState<Record<string, boolean>>({ base_target: true, normalized_measured_fr: true, desired_response: true, final_target: true });
-  const measurementRef = useRef<HTMLInputElement>(null);
-  const preferredRef = useRef<HTMLInputElement>(null);
-  const targetRef = useRef<HTMLInputElement>(null);
+  const [iems, setIems] = useState<IEM[]>([]), [targets, setTargets] = useState<Target[]>([]), [selected, setSelected] = useState<string[]>([]);
+  const [result, setResult] = useState<Result | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [online, setOnline] = useState(false);
+  const [visible, setVisible] = useState<Record<string, boolean>>({ base_target: true, final_target: true, median_delta: true });
+  const [openStages, setOpenStages] = useState(false);
+  const [upload, setUpload] = useState({ name: "", measurement: null as File | null, preferred: null as File | null, notes: "" });
+  const [targetUpload, setTargetUpload] = useState({ name: "", file: null as File | null, kind: "base", notes: "" });
+  const measurementRef = useRef<HTMLInputElement>(null), preferredRef = useRef<HTMLInputElement>(null), targetRef = useRef<HTMLInputElement>(null);
 
-  async function load() {
-    const [iemsResponse, targetsResponse] = await Promise.all([
-      fetch(`${API}/api/iems`, { cache: "no-store" }),
-      fetch(`${API}/api/targets`, { cache: "no-store" }),
-    ]);
-    if (!iemsResponse.ok || !targetsResponse.ok) throw new Error("Backend API tidak boleh dicapai.");
-    const iems = await iemsResponse.json();
-    const targetData = await targetsResponse.json();
-    setItems(iems.items || []);
-    setTargets(targetData.items || []);
-  }
+  async function load() { const [a, b, h] = await Promise.all([fetch(`${API}/api/iems`, { cache: "no-store" }), fetch(`${API}/api/targets`, { cache: "no-store" }), fetch(`${API}/api/health`, { cache: "no-store" })]); if (!a.ok || !b.ok) throw new Error("Backend API unavailable"); setIems((await a.json()).items || []); setTargets((await b.json()).items || []); setOnline(h.ok); }
+  useEffect(() => { load().catch(e => { setOnline(false); setError(e instanceof Error ? e.message : "Backend API unavailable"); }); }, []);
 
-  useEffect(() => { load().catch(err => setMessage(err instanceof Error ? err.message : "Backend API tidak boleh dicapai.")); }, []);
+  async function submitIem(e: FormEvent) { e.preventDefault(); if (!upload.name || !upload.measurement || !upload.preferred) return setError("Name, measurement and preferred PEQ are required."); const form = new FormData(); form.append("name", upload.name); form.append("measurement_file", upload.measurement); form.append("preferred_file", upload.preferred); form.append("notes", upload.notes); await submitForm("/api/iems/import", form, () => { setUpload({ name: "", measurement: null, preferred: null, notes: "" }); if (measurementRef.current) measurementRef.current.value = ""; if (preferredRef.current) preferredRef.current.value = ""; }); }
+  async function submitTarget(e: FormEvent) { e.preventDefault(); if (!targetUpload.name || !targetUpload.file) return setError("Target name and file are required."); const form = new FormData(); form.append("name", targetUpload.name); form.append("target_file", targetUpload.file); form.append("kind", targetUpload.kind); form.append("notes", targetUpload.notes); await submitForm("/api/targets/import", form, () => { setTargetUpload({ name: "", file: null, kind: "base", notes: "" }); if (targetRef.current) targetRef.current.value = ""; }); }
+  async function submitForm(path: string, body: FormData, done: () => void) { setError(""); try { const r = await fetch(`${API}${path}`, { method: "POST", body }); const data = await r.json(); if (!r.ok) throw new Error(data.detail || "Upload failed"); done(); await load(); } catch (e) { setError(e instanceof Error ? e.message : "Upload failed"); } }
+  async function generate() { if (!selected.length) return setError("Select at least one IEM."); setBusy(true); setError(""); try { const r = await fetch(`${API}/api/v44/generate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "robust_target", iem_ids: selected }) }); const data = await r.json(); if (!r.ok) throw new Error(data.detail || "Generation failed"); setResult(data); } catch (e) { setError(e instanceof Error ? e.message : "Generation failed"); } finally { setBusy(false); } }
 
-  async function submitIEM(e: FormEvent) {
-    e.preventDefault(); setMessage("");
-    if (!name.trim() || !measurement || !preferred) { setMessage("Nama IEM, measurement dan PEQ diperlukan."); return; }
-    const form = new FormData(); form.append("name", name); form.append("measurement_file", measurement); form.append("preferred_file", preferred); form.append("notes", notes);
-    setBusy(true);
-    try {
-      const res = await fetch(`${API}/api/iems/import`, { method: "POST", body: form });
-      const data = await res.json(); if (!res.ok) throw new Error(data.detail || "Import IEM gagal.");
-      setMessage(`IEM diimport: ${data.item.name}`); setName(""); setMeasurement(null); setPreferred(null); setNotes("");
-      if (measurementRef.current) measurementRef.current.value = ""; if (preferredRef.current) preferredRef.current.value = "";
-      await load();
-    } catch (err) { setMessage(err instanceof Error ? err.message : "Import IEM gagal."); } finally { setBusy(false); }
-  }
-
-  async function submitTarget(e: FormEvent) {
-    e.preventDefault(); setTargetMessage("");
-    if (!targetName.trim() || !targetFile) { setTargetMessage("Nama target dan fail target diperlukan."); return; }
-    const form = new FormData(); form.append("name", targetName); form.append("target_file", targetFile); form.append("kind", targetKind); form.append("notes", targetNotes);
-    setTargetBusy(true);
-    try {
-      const res = await fetch(`${API}/api/targets/import`, { method: "POST", body: form });
-      const data = await res.json(); if (!res.ok) throw new Error(data.detail || "Import target gagal.");
-      setTargetMessage(`Target diimport: ${data.item.name}`); setTargetName(""); setTargetFile(null); setTargetNotes("");
-      if (targetRef.current) targetRef.current.value = ""; await load();
-    } catch (err) { setTargetMessage(err instanceof Error ? err.message : "Import target gagal."); } finally { setTargetBusy(false); }
-  }
-
-  async function generateV44() {
-    if (selectedV44.length === 0) { setV44Message("Select at least one IEM."); return; }
-    setV44Busy(true); setV44Message("");
-    try {
-      const res = await fetch(`${API}/api/v44/generate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: v44Mode, iem_ids: selectedV44 }) });
-      const data = await res.json(); if (!res.ok) throw new Error(data.detail || "V4.4 generation failed.");
-      setV44Result(data); setV44Message(data.final_target ? "V4.4 target generated." : "Intermediate curves generated; final target pending locked Delta Safe specification.");
-    } catch (err) { setV44Message(err instanceof Error ? err.message : "V4.4 generation failed."); } finally { setV44Busy(false); }
-  }
-
-  function toggleStage(stage: string) { setVisibleStages(prev => ({ ...prev, [stage]: !prev[stage] })); }
-
-  return (
-    <main style={{ maxWidth: 1160, margin: "0 auto", padding: "48px 24px" }}>
-      <header style={{ marginBottom: 36 }}><div style={{ fontSize: 13, opacity: .55, letterSpacing: 2 }}>ZUHIR</div><h1 style={{ fontSize: 34, margin: "8px 0" }}>Personal Earprint Engine</h1><p style={{ opacity: .7 }}>IEM Library • Target Library • V4.4 Backbone</p></header>
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 24 }}>
-        <div style={cardStyle}>
-          <h2 style={{ marginTop: 0 }}>Add IEM</h2><p style={{ opacity: .65, fontSize: 14 }}>Upload measurement FR + SoundEQ Dore PEQ. Metadata dan fail prepared dijana automatik.</p>
-          <form onSubmit={submitIEM} style={{ display: "grid", gap: 16 }}>
-            <Field label="IEM Name"><input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. 7Hz Timeless" style={inputStyle} /></Field>
-            <Field label="Measurement FR"><input ref={measurementRef} type="file" accept=".txt,.csv" onChange={e => setMeasurement(e.target.files?.[0] || null)} /></Field>
-            <Field label="SoundEQ Dore PEQ"><input ref={preferredRef} type="file" accept=".txt,.csv" onChange={e => setPreferred(e.target.files?.[0] || null)} /></Field>
-            <Field label="Notes (optional)"><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} style={inputStyle} /></Field>
-            <button disabled={busy} type="submit" style={{ padding: 13, borderRadius: 10, border: 0, background: "#fff", color: "#000", fontWeight: 700 }}>{busy ? "Importing…" : "Import IEM"}</button>{message && <div style={{ fontSize: 13, opacity: .8 }}>{message}</div>}
-          </form>
-        </div>
-        <div style={cardStyle}>
-          <h2 style={{ marginTop: 0 }}>Add Target</h2><p style={{ opacity: .65, fontSize: 14 }}>Upload Base Target asal. Fail asal dikekalkan dan salinan prepared mempunyai titik tepat 1000 Hz.</p>
-          <form onSubmit={submitTarget} style={{ display: "grid", gap: 16 }}>
-            <Field label="Target Name"><input value={targetName} onChange={e => setTargetName(e.target.value)} placeholder="e.g. Headphones.com IEM DF" style={inputStyle} /></Field>
-            <Field label="Target Type"><select value={targetKind} onChange={e => setTargetKind(e.target.value)} style={inputStyle}><option value="base">Base Target</option><option value="custom">Custom Target</option></select></Field>
-            <Field label="Target FR"><input ref={targetRef} type="file" accept=".txt,.csv" onChange={e => setTargetFile(e.target.files?.[0] || null)} /></Field>
-            <Field label="Notes (optional)"><textarea value={targetNotes} onChange={e => setTargetNotes(e.target.value)} rows={3} style={inputStyle} /></Field>
-            <button disabled={targetBusy} type="submit" style={{ padding: 13, borderRadius: 10, border: 0, background: "#fff", color: "#000", fontWeight: 700 }}>{targetBusy ? "Importing…" : "Import Target"}</button>{targetMessage && <div style={{ fontSize: 13, opacity: .8 }}>{targetMessage}</div>}
-          </form>
-        </div>
-      </section>
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 24, marginTop: 24 }}>
-        <Library title="IEM Library" empty="No IEMs imported yet." items={items.map(item => ({ key: item.slug, title: item.name, detail: `${item.status} · FR ${item.has_measurement ? "✓" : "—"} · PEQ ${item.has_preferred ? "✓" : "—"} · metadata ${item.has_metadata ? "✓" : "—"}` }))} />
-        <Library title="Target Library" empty="No targets imported yet." items={targets.map(item => ({ key: `${item.collection}/${item.slug}`, title: item.name, detail: `${item.kind === "base" ? "Base Target" : "Custom Target"} · ${item.status} · prepared ${item.has_prepared ? "✓" : "—"} · original ${item.has_source ? "✓" : "—"}` }))} />
-      </section>
-      <section style={{ ...cardStyle, marginTop: 24 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start", flexWrap: "wrap" }}>
-          <div><div style={{ fontSize: 13, letterSpacing: 2, opacity: .65 }}>TARGET MODE</div><h2 style={{ margin: "8px 0" }}>V4.4 Earprint Workspace</h2><p style={{ opacity: .65, marginTop: 0 }}>Base Target: <strong>Headphones.com IEM DF (B105 + 8 dB)</strong></p></div>
-          <div style={{ display: "flex", gap: 8 }}><button onClick={() => setV44Mode("robust_target")} aria-pressed={v44Mode === "robust_target"} style={modeButton(v44Mode === "robust_target")}>Robust Target</button><button onClick={() => setV44Mode("pure_earprint")} aria-pressed={v44Mode === "pure_earprint"} style={modeButton(v44Mode === "pure_earprint")}>Pure EarPrint</button></div>
-        </div>
-        <Field label="Select multiple IEMs from the IEM Library"><select multiple value={selectedV44} onChange={e => setSelectedV44(Array.from(e.target.selectedOptions, option => option.value))} style={{ ...inputStyle, minHeight: 140 }}>{items.map(item => <option key={item.slug} value={item.slug}>{item.name}</option>)}</select></Field>
-        <button onClick={generateV44} disabled={v44Busy} style={{ marginTop: 16, padding: 13, borderRadius: 10, border: 0, background: "#d9b36c", color: "#111", fontWeight: 700 }}>{v44Busy ? "Generating…" : "Generate V4.4 Target"}</button>{v44Message && <p style={{ opacity: .8 }}>{v44Message}</p>}
-        {v44Result && <ValidationLab result={v44Result} visibleStages={visibleStages} toggleStage={toggleStage} />}
-      </section>
-    </main>
-  );
+  return <main className="min-h-screen pb-12 pt-[env(safe-area-inset-top)]"><div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-10 -mx-4 mb-8 flex items-center justify-between border-b border-zinc-800/80 bg-zinc-950/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"><div><p className="text-xs font-semibold tracking-[0.28em] text-amber-400">ZUHIR</p><h1 className="mt-1 text-lg font-semibold tracking-tight sm:text-xl">Personal Earprint Engine</h1></div><div className="flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400"><span className={`h-2 w-2 rounded-full ${online ? "bg-amber-400" : "bg-zinc-600"}`} />{online ? "API live" : "API offline"}</div></header>
+    {error && <div role="alert" className="mb-6 flex items-center justify-between rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">{error}<button className="min-h-11 px-2 text-amber-400" onClick={() => setError("")}>Dismiss</button></div>}
+    <section className="mb-10"><SectionTitle eyebrow="LIBRARY" title="Bring your listening data together" /><div className="grid gap-4 md:grid-cols-2"><UploadCard icon={Headphones} title="Add IEM" description="Measurement FR and SoundEQ Dore preferred PEQ." onSubmit={submitIem}><Field label="IEM name"><input className={input} value={upload.name} onChange={e => setUpload({ ...upload, name: e.target.value })} placeholder="7Hz Timeless" /></Field><FileField label="Measurement FR" inputRef={measurementRef} onChange={f => setUpload({ ...upload, measurement: f })} /><FileField label="Preferred PEQ" inputRef={preferredRef} onChange={f => setUpload({ ...upload, preferred: f })} /><button className="btn-primary"><Upload size={16} /> Import IEM</button></UploadCard><UploadCard icon={Activity} title="Add Target" description="Upload a source curve for the Target Library." onSubmit={submitTarget}><Field label="Target name"><input className={input} value={targetUpload.name} onChange={e => setTargetUpload({ ...targetUpload, name: e.target.value })} placeholder="Base Target" /></Field><Field label="Type"><select className={input} value={targetUpload.kind} onChange={e => setTargetUpload({ ...targetUpload, kind: e.target.value })}><option value="base">Base Target</option><option value="custom">Custom Target</option></select></Field><FileField label="Target FR" inputRef={targetRef} onChange={f => setTargetUpload({ ...targetUpload, file: f })} /><button className="btn-primary"><Upload size={16} /> Import Target</button></UploadCard></div></section>
+    <section className="mb-10 grid gap-4 lg:grid-cols-2"><Library title="IEM Library" icon={Headphones} items={iems.map(x => ({ name: x.name, detail: `${x.status} · FR ${x.has_measurement ? "ready" : "missing"} · PEQ ${x.has_preferred ? "ready" : "missing"}` }))} /><Library title="Target Library" icon={Activity} items={targets.map(x => ({ name: x.name, detail: `${x.kind || "target"} · ${x.status} · ${x.has_prepared ? "prepared" : "not prepared"}` }))} /></section>
+    <section className={`${card} overflow-hidden`}><div className="border-b border-zinc-800 p-5 sm:p-7"><div className="flex flex-col justify-between gap-5 md:flex-row md:items-start"><div><p className="text-xs font-semibold tracking-[0.2em] text-amber-400">TARGET MODE</p><h2 className="mt-2 text-2xl font-semibold tracking-tight">Robust Target workspace</h2><p className="mt-2 max-w-xl text-sm text-zinc-400">Select the IEMs that should contribute one independent vote to the target.</p></div><div className="flex rounded-xl border border-zinc-800 bg-zinc-950 p-1"><div className="rounded-lg bg-amber-400 px-4 py-3 text-sm font-semibold text-zinc-950">Robust Target</div><div className="px-4 py-3 text-sm text-zinc-500">Pure EarPrint</div></div></div><div className="mt-6"><label className="mb-2 block text-sm font-medium text-zinc-300">IEM votes</label><select multiple className={`${input} min-h-36 py-2`} value={selected} onChange={e => setSelected(Array.from(e.target.selectedOptions, x => x.value))}>{iems.map(x => <option key={x.slug} value={x.slug}>{x.name}</option>)}</select><p className="mt-2 text-xs text-zinc-500">{selected.length} selected · use Ctrl/Cmd-click for multiple selection</p></div><button onClick={generate} disabled={busy} className="btn-primary mt-5 min-h-12 w-full sm:w-auto">{busy ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}{busy ? "Generating…" : "Generate Robust Target"}</button></div>{result ? <ResultPanel result={result} visible={visible} setVisible={setVisible} openStages={openStages} setOpenStages={setOpenStages} /> : <div className="p-8 text-center text-sm text-zinc-500">Your generated target and validation lab will appear here.</div>}</section>
+  </div></main>;
 }
 
-function Library({ title, empty, items }: { title: string; empty: string; items: { key: string; title: string; detail: string }[] }) {
-  return <div style={cardStyle}><h2 style={{ marginTop: 0 }}>{title}</h2>{items.length === 0 ? <p style={{ opacity: .55 }}>{empty}</p> : <div style={{ display: "grid", gap: 10 }}>{items.map(item => <div key={item.key} style={{ padding: 14, border: "1px solid #252525", borderRadius: 12, background: "#0b0b0b" }}><div style={{ fontWeight: 700 }}>{item.title}</div><div style={{ fontSize: 12, opacity: .6, marginTop: 5 }}>{item.detail}</div></div>)}</div>}</div>;
+function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) { return <div className="mb-4"><p className="text-xs font-semibold tracking-[0.2em] text-amber-400">{eyebrow}</p><h2 className="mt-1 text-xl font-semibold">{title}</h2></div>; }
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-2 block text-xs font-medium text-zinc-400">{label}</span>{children}</label>; }
+function FileField({ label, inputRef, onChange }: { label: string; inputRef: React.RefObject<HTMLInputElement>; onChange: (f: File | null) => void }) { return <Field label={label}><input ref={inputRef} className={`${input} file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-xs file:font-medium file:text-zinc-100`} type="file" accept=".txt,.csv" onChange={e => onChange(e.target.files?.[0] || null)} /></Field>; }
+function UploadCard({ icon: Icon, title, description, onSubmit, children }: { icon: typeof Activity; title: string; description: string; onSubmit: (e: FormEvent) => void; children: React.ReactNode }) { return <form onSubmit={onSubmit} className={`${card} grid gap-4 p-5 sm:p-6`}><div className="flex items-center gap-3"><div className="rounded-xl bg-amber-400/10 p-3 text-amber-400"><Icon size={20} /></div><div><h3 className="font-semibold">{title}</h3><p className="text-sm text-zinc-500">{description}</p></div></div>{children}</form>; }
+function Library({ title, icon: Icon, items }: { title: string; icon: typeof Activity; items: { name: string; detail: string }[] }) { return <div className={`${card} p-5 sm:p-6`}><div className="mb-4 flex items-center gap-3"><Icon className="text-amber-400" size={18} /><h3 className="font-semibold">{title}</h3><span className="ml-auto rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-400">{items.length}</span></div>{items.length ? <div className="grid gap-2">{items.map(x => <div key={x.name} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"><p className="truncate text-sm font-medium">{x.name}</p><p className="mt-1 text-xs text-zinc-500">{x.detail}</p></div>)}</div> : <p className="text-sm text-zinc-500">Nothing imported yet.</p>}</div>; }
+
+function ResultPanel({ result, visible, setVisible, openStages, setOpenStages }: { result: Result; visible: Record<string, boolean>; setVisible: React.Dispatch<React.SetStateAction<Record<string, boolean>>>; openStages: boolean; setOpenStages: React.Dispatch<React.SetStateAction<boolean>> }) {
+  const chart = useMemo(() => { const base = result.base_target; if (!base) return []; return base.frequency_hz.map((frequency_hz, i) => ({ frequency_hz, base: base.level_db[i], final: result.final_target?.level_db[i], median: result.median_delta?.level_db[i] })); }, [result]);
+  function download() { if (!result.final_target) return; const text = result.final_target.frequency_hz.map((f, i) => `${f.toFixed(6)}\t${result.final_target!.level_db[i].toFixed(6)}`).join("\n"); const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" })); const a = document.createElement("a"); a.href = url; a.download = `RobustTarget_${Date.now()}.txt`; a.click(); URL.revokeObjectURL(url); }
+  return <div className="p-5 sm:p-7"><div className="grid gap-3 sm:grid-cols-3"><Stat label="IEM votes" value={`${result.iem_count || Object.keys(result.per_iem).length}`} /><Stat label="Final target" value={result.final_target ? "Ready" : "Pending"} accent={!!result.final_target} /><Stat label="Anchor" value="1000 Hz" accent /></div><div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-3 sm:p-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold">Frequency response</h3><p className="text-xs text-zinc-500">20 Hz — 20 kHz · log frequency view</p></div><button onClick={download} disabled={!result.final_target} className="btn-secondary"><Download size={16} /> Download Robust Target</button></div><div className="h-[280px] w-full sm:h-[380px]"><ResponsiveContainer width="100%" height="100%"><LineChart data={chart} margin={{ top: 8, right: 12, left: -18, bottom: 4 }}><CartesianGrid stroke="#27272a" vertical={false} /><XAxis dataKey="frequency_hz" type="number" scale="log" domain={[20, 20000]} tick={{ fill: "#71717a", fontSize: 11 }} tickFormatter={x => x >= 1000 ? `${x / 1000}k` : `${x}`} /><YAxis tick={{ fill: "#71717a", fontSize: 11 }} tickFormatter={x => `${x} dB`} width={56} /><Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 12 }} labelFormatter={x => `${Number(x).toFixed(0)} Hz`} /><Legend wrapperStyle={{ color: "#a1a1aa", fontSize: 12 }} /><Line hide={!visible.base_target} type="monotone" dataKey="base" name="Base Target" stroke="#a1a1aa" dot={false} strokeWidth={1.5} /><Line hide={!visible.final_target} type="monotone" dataKey="final" name="Final Target" stroke="#fbbf24" dot={false} strokeWidth={2.5} /><Line hide={!visible.median_delta} type="monotone" dataKey="median" name="Median Delta" stroke="#71717a" dot={false} strokeWidth={1} strokeDasharray="4 4" /></LineChart></ResponsiveContainer></div></div><div className="mt-5 flex flex-wrap gap-2">{[["base_target", "Base Target"], ["final_target", "Final Target"], ["median_delta", "Median Delta"]].map(([key, label]) => <button key={key} onClick={() => setVisible(v => ({ ...v, [key]: !v[key] }))} className={`min-h-11 rounded-xl border px-3 text-xs ${visible[key] ? "border-amber-400/50 bg-amber-400/10 text-amber-300" : "border-zinc-800 text-zinc-500"}`}>{visible[key] && <Check className="mr-1 inline" size={13} />}{label}</button>)}</div><div className="mt-6 border-t border-zinc-800 pt-5"><button onClick={() => setOpenStages(x => !x)} className="flex min-h-11 w-full items-center justify-between text-left font-semibold">Advanced stages <ChevronDown className={`transition ${openStages ? "rotate-180" : ""}`} size={18} /></button>{openStages && <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{stages.map(stage => { const value = (result as unknown as Record<string, unknown>)[stage]; const available = value !== null && value !== undefined; return <button key={stage} onClick={() => setVisible(v => ({ ...v, [stage]: !v[stage] }))} disabled={!available} className="flex min-h-11 items-center justify-between rounded-xl border border-zinc-800 px-3 text-left text-xs text-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"><span>{stage.replaceAll("_", " ")}</span>{available ? <span className={visible[stage] ? "text-amber-400" : "text-zinc-600"}>●</span> : <span>Not locked</span>}</button>; })}</div>}</div></div>;
 }
-
-function modeButton(active: boolean) { return { padding: "10px 14px", borderRadius: 8, border: "1px solid #404040", background: active ? "#d9b36c" : "#181818", color: active ? "#111" : "#fff", fontWeight: 700 }; }
-
-function ValidationLab({ result, visibleStages, toggleStage }: { result: V44Result; visibleStages: Record<string, boolean>; toggleStage: (stage: string) => void }) {
-  const stages = ["base_target", "normalized_base_target", "normalized_measured_fr", "reconstructed_peq", "normalized_peq", "desired_response", "personal_delta", "median_delta", "mad", "n_plus", "n_minus", "n_zero", "G", "C", "broad", "local", "feature_classification", "delta_safe", "final_target"];
-  const curves = Object.fromEntries(stages.map(stage => [stage, stage === "G" || stage === "C" || stage === "broad" || stage === "local" || stage === "feature_classification" || stage === "delta_safe" || stage === "final_target" ? (result as unknown as Record<string, unknown>)[stage] : (result as unknown as Record<string, unknown>)[stage]]));
-  return <div style={{ marginTop: 24, borderTop: "1px solid #2b2b2b", paddingTop: 20 }}><h3>Validation Lab</h3><p style={{ opacity: .7 }}>Measured FR · Desired Response · Final V4.4 Target · Required Correction · Original Preferred Correction</p>{result.final_target === null && <p style={{ color: "#d9b36c" }}>Final Target pending locked Delta Safe specification</p>}<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{stages.map(stage => <label key={stage} style={{ fontSize: 12, opacity: curves[stage] === null ? .45 : 1 }}><input type="checkbox" checked={visibleStages[stage] ?? false} disabled={curves[stage] === null} onChange={() => toggleStage(stage)} /> {stage === "feature_classification" ? "Feature Classification" : stage.replaceAll("_", " ")}{curves[stage] === null && " (Not locked)"}</label>)}</div><div style={{ display: "grid", gap: 6, marginTop: 14 }}>{stages.filter(stage => visibleStages[stage] && curves[stage] !== null).map(stage => <div key={stage} style={{ fontSize: 12, opacity: .78 }}><strong>{stage.replaceAll("_", " ")}</strong>: {formatCurve(curves[stage])}</div>)}</div>{Object.entries(result.per_iem).map(([id, iem]) => <div key={id} style={{ marginTop: 18, padding: 14, background: "#0b0b0b", borderRadius: 10 }}><strong>{id}</strong><div style={{ fontSize: 12, opacity: .65, marginTop: 6 }}>Required Correction: {result.final_target ? formatCurve(iem.required_correction) : "Final Target pending locked Delta Safe specification"} · Original Preferred Correction: {formatCurve(iem.original_preferred_correction)}</div><div style={{ marginTop: 8, fontSize: 12, opacity: .75 }}>Visible curves: {Object.keys(iem).filter(key => visibleStages[key]).join(", ") || "none"}</div></div>)}</div>;
-}
-
-function formatCurve(value: unknown) { const curve = value as V44Curve; if (!curve || !curve.frequency_hz?.length) return "Not locked"; const last = curve.frequency_hz.length - 1; return `${curve.frequency_hz.length} points · ${curve.level_db[0].toFixed(2)} dB @ ${curve.frequency_hz[0].toFixed(0)} Hz → ${curve.level_db[last].toFixed(2)} dB @ ${curve.frequency_hz[last].toFixed(0)} Hz`; }
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) { return <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"><p className="text-xs text-zinc-500">{label}</p><p className={`mt-2 text-lg font-semibold ${accent ? "text-amber-400" : "text-zinc-100"}`}>{value}</p></div>; }
