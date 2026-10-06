@@ -108,8 +108,22 @@ def require_exact_1000_hz(f: np.ndarray, label: str) -> None:
         raise ValueError(f"{label} must contain an exact 1000 Hz calculation anchor")
 
 
+_NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
 _FILTER_RE = re.compile(
-    r"(?:Filter\s*\d+\s*:\s*)?(PK|HS|LS)\s*(?:Fc\s*)?([0-9.]+)\s*(?:Hz)?\s*(?:Gain\s*)?([-+]?[0-9.]+)\s*(?:dB)?\s*(?:Q\s*)?([0-9.]+)", re.I
+    rf"(?:Filter\s*\d+\s*:\s*)?(?:ON\s+)?(PK|HS|LS)\s*(?:Fc\s*)?({_NUMBER})\s*(?:Hz)?\s*(?:Gain\s*)?({_NUMBER})\s*(?:dB)?\s*(?:Q\s*)?({_NUMBER})",
+    re.I,
+)
+_COMMENT_PREFIXES = ("#", "//", ";")
+_METADATA_PREFIXES = (
+    "soundeq dore",
+    "device:",
+    "generated:",
+    "preamp:",
+    "channel:",
+    "sample rate:",
+    "format:",
+    "author:",
+    "notes:",
 )
 
 
@@ -117,17 +131,33 @@ def parse_peq(text: str | Sequence[PEQFilter]) -> list[PEQFilter]:
     if not isinstance(text, str):
         return list(text)
     filters: list[PEQFilter] = []
-    for line in text.splitlines():
-        line = line.strip()
-        if not line or line.startswith(("#", "//", ";")):
+    for line_number, raw_line in enumerate(text.splitlines(), start=1):
+        line = raw_line.strip()
+        if not line:
             continue
-        m = _FILTER_RE.search(line)
+        lowered = line.lower()
+        if line.startswith(_COMMENT_PREFIXES) or lowered.startswith(_METADATA_PREFIXES):
+            continue
+        m = _FILTER_RE.fullmatch(line)
         if not m:
             parts = [p.strip() for p in line.split(",")]
             if len(parts) == 4 and parts[0].upper() in {"PK", "HS", "LS"}:
-                filters.append(PEQFilter(parts[0].upper(), float(parts[1]), float(parts[2]), float(parts[3])))
+                try:
+                    item = PEQFilter(parts[0].upper(), float(parts[1]), float(parts[2]), float(parts[3]))
+                except ValueError as exc:
+                    raise ValueError(f"Malformed PEQ filter on line {line_number}") from exc
+                filters.append(item)
+            else:
+                raise ValueError(f"Malformed or unsupported PEQ filter on line {line_number}: {line}")
             continue
-        filters.append(PEQFilter(m.group(1).upper(), float(m.group(2)), float(m.group(3)), float(m.group(4))))
+        try:
+            item = PEQFilter(m.group(1).upper(), float(m.group(2)), float(m.group(3)), float(m.group(4)))
+        except ValueError as exc:
+            raise ValueError(f"Malformed PEQ filter on line {line_number}") from exc
+        filters.append(item)
+    for item in filters:
+        if not all(math.isfinite(value) for value in (item.frequency_hz, item.gain_db, item.q)) or item.frequency_hz <= 0 or item.q <= 0:
+            raise ValueError("PEQ filters require finite positive frequency/Q and finite gain")
     return filters
 
 

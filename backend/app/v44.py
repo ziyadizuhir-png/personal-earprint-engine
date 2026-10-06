@@ -15,6 +15,7 @@ from engine.v44.constants import (
     NORMALIZATION_HZ,
 )
 
+from .ingest import validate_preferred
 from .storage import BASE_TARGET_ROOT, IEM_ROOT, discover_collection
 from . import storage as _storage
 
@@ -45,12 +46,35 @@ def _read_curve(path: Path) -> Curve:
     return Curve([x for x, _ in sorted(dedup.items())], [y for _, y in sorted(dedup.items())])
 
 
+def _preferred_status(folder: Path) -> dict[str, Any]:
+    preferred = folder / "preferred.txt"
+    status: dict[str, Any] = {
+        "has_preferred": preferred.exists(),
+        "peq_source": "preferred.txt",
+        "peq_valid": False,
+        "peq_filter_count": 0,
+    }
+    if not preferred.exists():
+        status["peq_error"] = "preferred.txt is missing"
+        return status
+    try:
+        info = validate_preferred(preferred)
+    except ValueError as exc:
+        status["peq_error"] = str(exc)
+        return status
+    status.update({"peq_valid": True, "peq_filter_count": info["filter_count"]})
+    return status
+
+
 def _iem(folder: Path) -> IEMInput:
     metadata = _metadata(folder)
     prepared = folder / "measurement.csv"
     source = folder / "measurement_source.txt"
-    if not prepared.exists() or not (folder / "preferred.txt").exists():
-        raise ValueError(f"IEM {folder.name} is missing prepared/PEQ data")
+    if not prepared.exists():
+        raise ValueError(f"IEM {folder.name} is missing prepared measurement data")
+    preferred_status = _preferred_status(folder)
+    if not preferred_status["peq_valid"]:
+        raise ValueError(f"IEM {folder.name} has invalid SoundEQ Dore PEQ: {preferred_status['peq_error']}")
     prepared_curve = _read_curve(prepared)
     try:
         original_curve = _read_curve(source) if source.exists() else prepared_curve
@@ -160,7 +184,10 @@ def v44_iems() -> dict[str, Any]:
         if not folder.is_dir():
             continue
         metadata = _metadata(folder)
-        items.append({"id": folder.name, "name": metadata.get("name", folder.name), "metadata": metadata, "has_original": (folder / "measurement_source.txt").exists(), "has_prepared": (folder / "measurement.csv").exists(), "has_preferred": (folder / "preferred.txt").exists()})
+        item = {"id": folder.name, "name": metadata.get("name", folder.name), "metadata": metadata, "has_original": (folder / "measurement_source.txt").exists(), "has_prepared": (folder / "measurement.csv").exists()}
+        item.update(_preferred_status(folder))
+        item["ready"] = bool(item["has_prepared"] and item["peq_valid"])
+        items.append(item)
     return {"items": items}
 
 

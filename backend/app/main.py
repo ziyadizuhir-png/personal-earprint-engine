@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from .ingest import ingest_iem, ingest_target
+from .ingest import ingest_iem, ingest_target, validate_preferred
 from .storage import BASE_TARGET_ROOT, IEM_ROOT, TARGET_ROOT, discover_collection, ensure_data_dirs, storage_info
 from .v44 import router as v44_router
 from .robust_target import router as robust_target_router
@@ -80,12 +80,16 @@ def list_iems():
     items = list_collection(IEM_ROOT, "iems")
     for item in items:
         folder = IEM_ROOT / item["slug"]
-        item.update(
-            {
-                "has_measurement": (folder / "measurement.csv").exists(),
-                "has_preferred": (folder / "preferred.txt").exists(),
-            }
-        )
+        preferred = folder / "preferred.txt"
+        item.update({"has_measurement": (folder / "measurement.csv").exists(), "has_preferred": preferred.exists(), "peq_source": "preferred.txt", "peq_valid": False, "peq_filter_count": 0})
+        if not preferred.exists():
+            item["peq_error"] = "preferred.txt is missing"
+        else:
+            try:
+                item.update({"peq_valid": True, "peq_filter_count": validate_preferred(preferred)["filter_count"]})
+            except ValueError as exc:
+                item["peq_error"] = str(exc)
+        item["ready"] = bool(item["has_measurement"] and item["peq_valid"])
     return {"items": items}
 
 

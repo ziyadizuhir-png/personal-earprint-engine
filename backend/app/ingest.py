@@ -7,6 +7,8 @@ import math
 import re
 from pathlib import Path
 
+from engine.v44_engine import parse_peq
+
 from .storage import slugify, unique_iem_dir, unique_target_dir
 
 
@@ -96,19 +98,38 @@ def prepare_measurement(source: Path, output: Path) -> dict:
     }
 
 
-def basic_peq_validation(path: Path) -> dict:
-    text = path.read_text(encoding="utf-8", errors="ignore").strip()
+def validate_preferred_text(text: str) -> dict:
+    text = text.strip()
     if not text:
         raise ValueError("PEQ file is empty.")
-    supported = bool(re.search(r"\b(PK|HS|LS)\b", text, flags=re.I))
+    filters = parse_peq(text)
+    if not filters:
+        raise ValueError("PEQ file contains no valid PK, HS, or LS filters.")
     return {
         "non_empty": True,
-        "contains_supported_filter_type": supported,
+        "valid": True,
+        "filter_count": len(filters),
+        "contains_supported_filter_type": True,
         "source_format": "SoundEQ Dore / simplified filter text",
     }
 
 
+def validate_preferred(path: Path) -> dict:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        raise ValueError(f"Unable to read PEQ file: {path.name}") from exc
+    return validate_preferred_text(text)
+
+
+def basic_peq_validation(path: Path) -> dict:
+    """Backward-compatible name for the canonical preferred.txt validator."""
+    return validate_preferred(path)
+
+
 def ingest_iem(name: str, measurement, preferred, notes: str | None = None) -> dict:
+    preferred_text = preferred.decode("utf-8", errors="replace")
+    peq_info = validate_preferred_text(preferred_text)
     base_dir = unique_iem_dir(slugify(name))
     base_dir.mkdir(parents=True, exist_ok=False)
     source_measurement = base_dir / "measurement_source.txt"
@@ -117,8 +138,6 @@ def ingest_iem(name: str, measurement, preferred, notes: str | None = None) -> d
     source_measurement.write_bytes(measurement)
     preferred_path.write_bytes(preferred)
     measurement_info = prepare_measurement(source_measurement, prepared_measurement)
-    peq_info = basic_peq_validation(preferred_path)
-
     metadata = {
         "name": name.strip(),
         "slug": base_dir.name,

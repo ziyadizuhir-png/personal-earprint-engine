@@ -93,3 +93,20 @@ pytest tests/test_v44_engine.py
 ```
 
 No PEQ solver was reintroduced.
+
+## PEQ ingestion reconciliation
+
+Every IEM continues to use the attached record layout:
+`measurement_source.txt`, `measurement.csv`, `preferred.txt`, and
+`metadata.json`. The canonical `parse_peq()` validator now accepts the
+SoundEQ Dore PK/HS/LS forms used by the seeded records, counts filters, and
+rejects malformed filter lines instead of silently producing an empty PEQ.
+Both `/api/iems` and `/api/v44/iems` report `peq_valid`,
+`peq_filter_count`, `peq_source`, and readiness. Generation reads that same
+`preferred.txt` through `_iem()` and blocks missing or invalid PEQ data.
+
+Robust Target provenance now hashes each selected IEM's prepared measurement
+and `preferred.txt`, together with the Base Target hash. Changing an attached
+PEQ therefore changes the dataset revision and target identity. Integration
+tests cover upload storage, exact reconstructed biquad response, PEQ changes,
+and missing/malformed preferred files.

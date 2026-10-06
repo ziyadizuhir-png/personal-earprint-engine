@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 from engine.robust_target import generate_robust_target
 from engine.v44.v44 import Curve, IEMInput
+from .ingest import sha256_file
 from .storage import BASE_TARGET_ROOT, IEM_ROOT, TARGET_ROOT, discover_collection, storage_info
 from .v44 import _base_target, _default_target_folder, _iem
 
@@ -96,16 +97,23 @@ def generate(payload: dict) -> dict:
     except (ValueError, FileNotFoundError) as exc:
         raise HTTPException(422, str(exc)) from exc
     active_iem_ids = [folder.name for folder in folders]
-    dataset_revision = hashlib.sha256(json.dumps({"base_target_id": base[0].name, "iem_ids": active_iem_ids}, separators=(",", ":"), sort_keys=True).encode()).hexdigest()
-    canonical = json.dumps({"base_target_id": base[0].name, "iem_ids": active_iem_ids, "frequency_hz": result.final_target.frequency_hz, "level_db": result.final_target.level_db}, separators=(",", ":"), allow_nan=False).encode()
+    iem_provenance = []
+    for folder in folders:
+        iem_provenance.append({"id": folder.name, "measurement_sha256": sha256_file(folder / "measurement.csv"), "preferred_sha256": sha256_file(folder / "preferred.txt")})
+    iem_provenance.sort(key=lambda item: item["id"])
+    base_target_file = base[0] / base[1].get("files", {}).get("target", "target.csv")
+    base_target_sha256 = sha256_file(base_target_file)
+    provenance = {"base_target_id": base[0].name, "base_target_sha256": base_target_sha256, "iems": iem_provenance}
+    dataset_revision = hashlib.sha256(json.dumps(provenance, separators=(",", ":"), sort_keys=True).encode()).hexdigest()
+    canonical = json.dumps({"provenance": provenance, "iem_ids": active_iem_ids, "frequency_hz": result.final_target.frequency_hz, "level_db": result.final_target.level_db}, separators=(",", ":"), allow_nan=False).encode()
     digest = hashlib.sha256(canonical).hexdigest()
     target_id = digest[:16]
-    artifact = {"status": "ready", "robust_target_id": target_id, "target_hash": digest, "dataset_revision": dataset_revision, "base_target_id": slug or base[0].name, "base_target_name": base[1].get("name", base[0].name), "active_iem_ids": active_iem_ids, "iem_count": len(iems), "canonical_curve_artifact": {"content_type": "application/json", "sha256": digest, "grid_type": "base_target_master"}, "interoperability_curve_artifact": {"content_type": "text/plain", "format": "tab-separated UTF-8", "path": f"/api/robust-targets/{target_id}/export"}, "validation": {"exact_1000_hz": True, "peq_filters": False}, "curve": result.final_target.__dict__, "base_target": result.base_target.__dict__, "final_target": result.final_target.__dict__, "intermediate": result.to_dict(), "warnings": result.warnings, "stage_status": result.stage_status}
+    artifact = {"status": "ready", "robust_target_id": target_id, "target_hash": digest, "dataset_revision": dataset_revision, "provenance": provenance, "base_target_id": slug or base[0].name, "base_target_name": base[1].get("name", base[0].name), "active_iem_ids": active_iem_ids, "iem_count": len(iems), "canonical_curve_artifact": {"content_type": "application/json", "sha256": digest, "grid_type": "base_target_master"}, "interoperability_curve_artifact": {"content_type": "text/plain", "format": "tab-separated UTF-8", "path": f"/api/robust-targets/{target_id}/export"}, "validation": {"exact_1000_hz": True, "peq_filters": False}, "curve": result.final_target.__dict__, "base_target": result.base_target.__dict__, "final_target": result.final_target.__dict__, "intermediate": result.to_dict(), "warnings": result.warnings, "stage_status": result.stage_status}
     artifact.update(result.to_dict())
     folder = TARGET_ROOT / target_id
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "artifact.json").write_text(json.dumps(artifact, separators=(",", ":"), allow_nan=False), encoding="utf-8")
-    (folder / "metadata.json").write_text(json.dumps({"robust_target_id": target_id, "target_hash": digest, "status": "ready", "base_target_id": artifact["base_target_id"], "iem_count": len(iems)}, separators=(",", ":")), encoding="utf-8")
+    (folder / "metadata.json").write_text(json.dumps({"robust_target_id": target_id, "target_hash": digest, "dataset_revision": dataset_revision, "status": "ready", "base_target_id": artifact["base_target_id"], "active_iem_ids": active_iem_ids, "iem_count": len(iems)}, separators=(",", ":")), encoding="utf-8")
     return artifact
 
 

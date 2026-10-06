@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from app.ingest import ingest_target, parse_measurement, prepare_measurement
+from app.ingest import ingest_iem, ingest_target, parse_measurement, prepare_measurement, validate_preferred_text
 
 
 def test_prepare_measurement_adds_exact_1000_hz(tmp_path: Path):
@@ -35,3 +35,30 @@ def test_ingest_target_keeps_source_and_marks_math_unapplied(monkeypatch, tmp_pa
     assert (item_dir / "target_source.txt").read_bytes().startswith(b"20 -2")
     assert (item_dir / "target.csv").exists()
     assert metadata["engine"]["mathematics_applied"] is False
+
+
+def test_preferred_validation_counts_supported_filters_and_rejects_malformed():
+    info = validate_preferred_text(
+        "# SoundEQ Dore\nFilter 1: ON PK Fc 1000 Hz Gain -2.00 dB Q 1.00\nHS,80,3,0.7\n"
+    )
+    assert info["valid"] is True
+    assert info["filter_count"] == 2
+    with pytest.raises(ValueError, match="Malformed"):
+        validate_preferred_text("Filter 1: ON PK Fc 1000 Hz Gain nope dB Q 1.00\n")
+
+
+def test_ingest_iem_stores_preferred_and_provenance(monkeypatch, tmp_path: Path):
+    import app.ingest as ingest_module
+
+    iem_root = tmp_path / "iems"
+    monkeypatch.setattr(ingest_module, "unique_iem_dir", lambda slug: iem_root / slug)
+    metadata = ingest_iem(
+        "Example IEM",
+        b"20 -2\n1000 0\n20000 -1\n",
+        b"Filter 1: ON PK Fc 1000 Hz Gain 2 dB Q 1\n",
+    )
+    item_dir = iem_root / "example-iem"
+    assert (item_dir / "preferred.txt").read_text(encoding="utf-8").startswith("Filter 1")
+    assert metadata["preferred"]["valid"] is True
+    assert metadata["preferred"]["filter_count"] == 1
+    assert metadata["source_hashes"]["preferred_sha256"]

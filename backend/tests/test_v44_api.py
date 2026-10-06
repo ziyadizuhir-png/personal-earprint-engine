@@ -16,7 +16,7 @@ def test_v44_discovers_real_library_and_base_target():
     iems = v44_iems()["items"]
     targets = v44_targets()["items"]
     assert iems
-    assert all(item["has_prepared"] and item["has_preferred"] for item in iems)
+    assert all(item["has_prepared"] and item["has_preferred"] and item["peq_valid"] and item["peq_filter_count"] > 0 for item in iems)
     defaults = [item for item in targets if item["is_default"]]
     assert len(defaults) == 1
     assert defaults[0]["name"] == "JM-1 DF (Tilt -0.8 dB/oct, B105 5 dB)"

@@ -22,6 +22,8 @@
   },
   "preferred": {
     "non_empty": true,
+    "valid": true,
+    "filter_count": 9,
     "contains_supported_filter_type": true,
     "source_format": "SoundEQ Dore / simplified filter text",
     "source": "SoundEQ Dore",
