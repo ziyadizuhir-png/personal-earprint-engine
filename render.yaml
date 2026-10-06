@@ -3,6 +3,7 @@ services:
     name: personal-earprint-engine-api
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
     healthCheckPath: /api/health
     envVars:
       - key: STORAGE_BACKEND

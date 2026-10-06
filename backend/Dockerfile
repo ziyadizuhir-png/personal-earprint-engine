@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     STORAGE_BACKEND=filesystem
 
 WORKDIR /app/backend
-COPY requirements.txt ./requirements.txt
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app ./app
+COPY backend/app ./app
 WORKDIR /app
 COPY engine ./engine
 COPY data ./data

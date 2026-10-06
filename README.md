@@ -104,6 +104,12 @@ HTTPS service URL, set the GitHub repository variable `NEXT_PUBLIC_API_URL` and
 rerun the Pages deployment. GitHub Pages cannot run FastAPI or provide
 persistent storage.
 
+Render uses the repository root as the Docker context and
+`backend/Dockerfile`; the Dockerfile copies the backend, engine, and seeded
+data directories explicitly. The backend is not considered deployed until a
+public HTTPS service has been created and `/api/health` and
+`/api/engine/status` respond successfully.
+
 ## Data layout
 
 ```text
