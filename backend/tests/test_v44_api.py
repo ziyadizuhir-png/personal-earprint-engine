@@ -30,7 +30,7 @@ def test_v44_generate_uses_selected_real_iem():
     assert body["final_target"] is not None
     assert body["delta_safe"] is not None
     assert body["base_target_info"]["name"] == "JM-1 DF (Tilt -0.8 dB/oct, B105 5 dB)"
-    assert body["selected_base_target"]["slug"] == "headphones-com-iem-df-b105-8-db"
+    assert body["selected_base_target"]["slug"] == "jm-1-df-tilt-0-8-db-oct-b105-5-db"
     assert body["iem_count"] == 1
     assert body["exact_1000_hz"] is True
     assert "Broad" in body["unresolved_stages"]
