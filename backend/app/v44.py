@@ -70,6 +70,7 @@ def _iem(folder: Path) -> IEMInput:
 
 def _default_target_folder() -> Path | None:
     candidates: list[tuple[str, Path]] = []
+    canonical_slug = "jm-1-df-tilt-0-8-db-oct-b105-5-db"
     wanted = "".join(ch for ch in DEFAULT_BASE_TARGET.lower() if ch.isalnum())
     # Tests and callers may replace BASE_TARGET_ROOT. In that case it is an
     # explicit authority and must be inspected fail-closed, without bundled
@@ -81,9 +82,11 @@ def _default_target_folder() -> Path | None:
             continue
         metadata = _metadata(folder)
         name = str(metadata.get("name", ""))
+        metadata_slug = str(metadata.get("slug", ""))
         identifier = str(metadata.get("identifier", metadata.get("id", "")))
         identifiers = [name, identifier, str(metadata.get("target_id", "")), str(metadata.get("default_target_id", ""))]
-        if any("".join(ch for ch in value.lower() if ch.isalnum()) == wanted for value in identifiers):
+        exact_identity = folder.name == canonical_slug and (not metadata_slug or metadata_slug == canonical_slug)
+        if exact_identity or any("".join(ch for ch in value.lower() if ch.isalnum()) == wanted for value in identifiers):
             candidates.append((folder.name, folder))
     return sorted(candidates, key=lambda item: item[0])[0][1] if candidates else None
 
