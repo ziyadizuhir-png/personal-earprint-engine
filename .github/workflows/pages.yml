@@ -34,7 +34,7 @@ jobs:
         working-directory: frontend
         env:
           GITHUB_PAGES: "true"
-          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_API_URL: https://personal-earprint-engine.onrender.com
       - uses: actions/upload-pages-artifact@v3
         with:
           path: frontend/out
