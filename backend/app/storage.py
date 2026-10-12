@@ -39,11 +39,11 @@ class FileSystemStorage:
         self.root = root
 
     def ensure_data_dirs(self) -> None:
-        for collection in ("iems", "base-targets", "targets"):
+        for collection in ("iems", "base-targets", "targets", "robust-targets"):
             self.collection_root(collection).mkdir(parents=True, exist_ok=True)
 
     def collection_root(self, collection: str) -> Path:
-        if collection not in {"iems", "base-targets", "targets"}:
+        if collection not in {"iems", "base-targets", "targets", "robust-targets"}:
             raise ValueError(f"Unknown storage collection: {collection}")
         return self.root / collection
 
@@ -112,6 +112,10 @@ def unique_iem_dir(slug: str) -> Path:
 def unique_target_dir(slug: str, kind: str = "base") -> Path:
     collection = "base-targets" if kind == "base" else "targets"
     return storage.unique_dir(collection, slug)
+
+
+def generated_target_root() -> Path:
+    return storage.collection_root("robust-targets")
 
 
 def storage_info() -> dict[str, str | bool]:
