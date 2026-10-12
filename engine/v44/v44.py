@@ -194,23 +194,12 @@ def _curve(f: np.ndarray, y: np.ndarray) -> Curve:
 
 
 def construct_target(base: Curve, delta_safe: Curve) -> Curve:
-    """Apply the production ownership and C1 cubic-Hermite handoff."""
+    """Apply v0.3.0 ownership: personal 1–11.2 kHz, smooth taper to 12 kHz."""
     f, b = base.array()
     fd, d = delta_safe.array()
     d = interpolate_log(fd, d, f)
-    # 1-10 kHz: full personal ownership; 10-12 kHz: half ownership.
-    w = np.where(f < 1000.0, 0.0, np.where(f < 10000.0, 1.0, np.where(f < 12000.0, 0.5, 0.0)))
-    handoff = (f >= 12000.0) & (f < 14000.0)
-    t = np.clip((f - 12000.0) / 2000.0, 0.0, 1.0)
-    # Cubic Hermite: value and left slope are preserved at 12 kHz; zero at 14 kHz.
-    left_slope = np.gradient(d, f)
-    d12 = np.interp(np.log(12000.0), np.log(f), d)
-    s12 = np.interp(np.log(12000.0), np.log(f), left_slope)
-    span = 2000.0
-    h00 = 2*t**3 - 3*t**2 + 1
-    h10 = t**3 - 2*t**2 + t
-    handoff_delta = h00*d12 + h10*span*s12
-    return _curve(f, b + np.where(handoff, handoff_delta, d * w))
+    w = np.where(f < 1000.0, 0.0, np.where(f <= 11200.0, 1.0, np.where(f < 12000.0, 1.0 - (3 * ((f - 11200.0) / 800.0) ** 2 - 2 * ((f - 11200.0) / 800.0) ** 3), 0.0)))
+    return _curve(f, b + d * w)
 
 
 def analyze_broad_local(frequency_hz: np.ndarray, robust_delta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -225,9 +214,8 @@ def analyze_broad_local(frequency_hz: np.ndarray, robust_delta: np.ndarray) -> t
 
 
 def apply_local_safety(frequency_hz: np.ndarray, delta: np.ndarray) -> np.ndarray:
-    """Apply the specified local 8.13 kHz safety factor only."""
-    bump = np.exp(-0.5 * (np.log2(frequency_hz / 8127.5) / 0.16) ** 2)
-    return delta * (1.0 - 0.45 * bump)
+    """v0.3.0 has no default safety notch; preserve the robust delta exactly."""
+    return np.asarray(delta, dtype=float).copy()
 
 
 def huber_center(matrix: np.ndarray, c: float = 1.345, floor_db: float = 1.0e-6, max_iter: int = 50) -> np.ndarray:
@@ -286,7 +274,7 @@ def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "r
         measured = np.asarray(curves["normalized_measured_fr"].level_db)
         desired = np.asarray(curves["desired_response"].level_db)
         curves["original_preferred_correction"] = _curve(bf, desired - measured)
-    robust = huber_center(matrix)
+    robust = median.copy()
     result.robust_delta = _curve(bf, robust)
     broad, local = analyze_broad_local(bf, robust)
     result.broad = _curve(bf, broad)
@@ -300,9 +288,9 @@ def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "r
         "Broad": "IMPLEMENTED_DIAGNOSTIC: approximately 1/12-octave local mean",
         "Local": "IMPLEMENTED_DIAGNOSTIC: RobustDelta - Broad",
         "Feature Classification": "SPEC_BLOCKED: qualitative rules lack executable thresholds/categories",
-        "Delta Safe": "IMPLEMENTED: local 8.13 kHz safety factor",
+        "Delta Safe": "IMPLEMENTED: exact median; no default safety notch",
     }
-    result.warnings.append("Feature Classification remains specification-blocked; Broad and Local are diagnostics and Delta Safe applies only the specified local 8.13 kHz safety factor.")
+    result.warnings.append("Feature Classification remains specification-blocked; v0.3.0 applies no default 8.1275 kHz safety notch or global attenuation.")
     final = np.asarray(result.final_target.level_db)
     for curves in result.per_iem.values():
         measured = np.asarray(curves["normalized_measured_fr"].level_db)

@@ -101,6 +101,12 @@ def _default_target_folder() -> Path | None:
     # repository fallback. Normal production uses the storage discovery merge.
     roots = [BASE_TARGET_ROOT] if BASE_TARGET_ROOT != _storage.BASE_TARGET_ROOT else discover_collection("base-targets")
     folders = [folder for root in roots if root.exists() for folder in sorted(root.iterdir())]
+    # Keep the bundled canonical identity discoverable even when a deployment
+    # creates an empty DATA_ROOT alongside the repository data.
+    if BASE_TARGET_ROOT == _storage.BASE_TARGET_ROOT:
+        bundled_canonical = _storage.BUNDLED_DATA_ROOT / "base-targets" / canonical_slug
+        if bundled_canonical.is_dir() and bundled_canonical not in folders:
+            folders.append(bundled_canonical)
     for folder in folders:
         if not folder.is_dir():
             continue

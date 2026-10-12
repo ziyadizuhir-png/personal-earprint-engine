@@ -1,14 +1,18 @@
-# Personal Earprint Engine — Dynamic Robust Target Engine
+# Personal Earprint Studio v0.3.0
 
-The production engine converts a dynamic collection of IEM measurements and
-SoundEQ Dore preferences into one deterministic Robust Target curve. AutoEQ
-and other PEQ optimizers are downstream consumers; this engine does not
-generate device-specific PEQ output.
+The canonical production engine is Personal Earprint Studio v0.3.0. It
+combines the nine initial IEM measurement/PEQ pairs into one deterministic
+Robust Target curve. The browser owns the numerical PEQ solver; the FastAPI
+service owns persistent source data and artifact storage.
+
+The v0.3.0 contract is documented in
+`docs/PERSONAL_EARPRINT_STUDIO_V0.3.0_SPEC.md`. V4.4 files are legacy audit
+material and are not mathematical authority.
 
 ## Included now
 
 - Next.js frontend in `frontend/`
-- FastAPI backend in `backend/`
+- FastAPI backend in `backend/` for storage and source-data delivery
 - IEM Library and Add IEM upload flow
 - Target Library and Add Target upload flow
 - Original upload preservation plus prepared frequency-response CSV
@@ -23,13 +27,12 @@ generate device-specific PEQ output.
 - `GET /api/engine/status`
 - `GET /api/iems`
 - `GET /api/base-targets`
-- `POST /api/robust-targets/generate`
+- `GET /api/robust-targets/inputs`
 
-Generation accepts `base_target_id` and an optional `iem_ids` list. The
-selected Base Target defines the master grid; the active dataset defines the
-votes. Each generation returns a canonical target hash and provenance summary.
-The legacy `/api/v44/*` routes are compatibility-only and do not expose a
-second production mathematical pipeline.
+The browser requests prepared inputs with `base_target_id` and `iem_ids`, then
+runs `frontend/lib/personal-earprint-v030.ts`. The legacy
+`POST /api/robust-targets/generate` and `/api/v44/*` routes remain compatibility
+surfaces only and are not used by the v0.3.0 UI.
 
 ## Local development
 
