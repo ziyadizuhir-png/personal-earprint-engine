@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 from engine.personal_earprint_v031 import Curve, IEMInput, generate
 from .ingest import sha256_file
-from .storage import BASE_TARGET_ROOT, discover_collection, storage_info
+from .storage import BASE_TARGET_ROOT, BUNDLED_DATA_ROOT, discover_collection, storage_info
 
 router = APIRouter(prefix="/api", tags=["personal-earprint-v031"])
 DEFAULT_BASE_ID = "headphones-com-iem-df-tilt-1-db-oct-b105-5-db"
@@ -34,12 +34,29 @@ def _iem(folder: Path) -> IEMInput:
     curve = _read_curve(measurement)
     return IEMInput(folder.name, curve, curve, preferred.read_text(encoding="utf-8", errors="replace"), _metadata(folder))
 
+def _canonical_base_folder() -> Path | None:
+    """Resolve the canonical bundle target across mounted and image data roots."""
+    candidates = [
+        BASE_TARGET_ROOT / DEFAULT_BASE_ID,
+        BUNDLED_DATA_ROOT / "base-targets" / DEFAULT_BASE_ID,
+    ]
+    seen: set[Path] = set()
+    for folder in candidates:
+        folder = folder.resolve()
+        if folder in seen:
+            continue
+        seen.add(folder)
+        if folder.is_dir() and (folder / "target_source.txt").is_file():
+            return folder
+    return None
+
 def _base_target(slug: str | None = None) -> tuple[Path, dict[str, Any], Curve]:
     target_id = slug or DEFAULT_BASE_ID
     if Path(target_id).name != target_id: raise HTTPException(400, "Invalid Base Target selection")
     if target_id != DEFAULT_BASE_ID:
         raise HTTPException(422, f"v0.3.1 only supports the bundle Base Target: {DEFAULT_BASE_ID}")
-    folder = BASE_TARGET_ROOT / target_id
+    folder = _canonical_base_folder() if target_id == DEFAULT_BASE_ID else None
+    if folder is None: raise HTTPException(404, f"Bundle Base Target not found: {target_id}")
     source = folder / "target_source.txt"
     if not source.exists(): raise HTTPException(404, f"Bundle Base Target not found: {target_id}")
     return folder, _metadata(folder), _read_curve(source)
@@ -59,12 +76,12 @@ def engine_status() -> dict[str, Any]:
     for folder in folders:
         try: _iem(folder); valid += 1
         except (OSError, ValueError) as exc: skipped.append({"id": folder.name, "reason": str(exc)})
-    return {"status": "ready" if valid == 9 and (BASE_TARGET_ROOT / DEFAULT_BASE_ID).is_dir() else "not_ready", "engine": ENGINE_VERSION, "version": "0.3.1", "engine_math": "PersonalDelta-FullBand-0.3.1", "storage": storage_info(), "dataset": {"discovered_iems": len(folders), "valid_active_iems": valid, "skipped_iems": skipped}, "base_target": DEFAULT_BASE_ID, "produces": ["robust_target_curve", "narrow_peak_diagnostics"]}
+    return {"status": "ready" if valid == 9 and _canonical_base_folder() is not None else "not_ready", "engine": ENGINE_VERSION, "version": "0.3.1", "engine_math": "PersonalDelta-FullBand-0.3.1", "storage": storage_info(), "dataset": {"discovered_iems": len(folders), "valid_active_iems": valid, "skipped_iems": skipped}, "base_target": DEFAULT_BASE_ID, "produces": ["robust_target_curve", "narrow_peak_diagnostics"]}
 
 @router.get("/base-targets")
 def base_targets() -> dict[str, Any]:
-    folder = BASE_TARGET_ROOT / DEFAULT_BASE_ID
-    if not folder.is_dir():
+    folder = _canonical_base_folder()
+    if folder is None:
         return {"items": []}
     return {"items": [{"name": _metadata(folder).get("name", DEFAULT_BASE_ID), "slug": DEFAULT_BASE_ID, "kind": "base", "status": "validated", "is_default": True, "collection": "base-targets"}]}
 
