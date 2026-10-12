@@ -16,12 +16,18 @@ def test_canonical_base_target_falls_back_to_bundled_data(tmp_path: Path, monkey
 
     listing = robust_target.base_targets()
 
-    assert listing["items"][0]["slug"] == robust_target.DEFAULT_BASE_ID
+    assert robust_target.DEFAULT_BASE_ID in {item["slug"] for item in listing["items"]}
     assert robust_target._canonical_base_folder() == bundled
     assert robust_target._base_target()[0] == bundled
 
 
-def test_noncanonical_base_target_is_rejected():
-    with pytest.raises(Exception) as error:
-        robust_target._base_target("5128-df-tilt-0-8-db-oct-b105-5-db")
-    assert "only supports the bundle Base Target" in str(error.value)
+def test_noncanonical_base_target_can_be_selected_as_a_reference_input():
+    folder, metadata, curve = robust_target._base_target("5128-df-tilt-0-8-db-oct-b105-5-db")
+    assert folder.name == "5128-df-tilt-0-8-db-oct-b105-5-db"
+    assert metadata["name"].startswith("5128 DF")
+    assert curve.frequency_hz[0] <= 20
+
+
+def test_robust_target_name_uses_selected_base_name_once():
+    assert robust_target.build_robust_target_name("My Custom Target") == "My Custom Target Robust"
+    assert robust_target.build_robust_target_name("My Custom Target Robust") == "My Custom Target Robust"

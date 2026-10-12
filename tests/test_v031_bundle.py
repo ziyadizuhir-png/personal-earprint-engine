@@ -7,7 +7,15 @@ ROOT = Path(__file__).parents[1]
 BASE = ROOT / "data" / "base-targets" / "headphones-com-iem-df-tilt-1-db-oct-b105-5-db" / "target_source.txt"
 
 def read_curve(path: Path) -> Curve:
-    rows = [tuple(map(float, line.split()[:2])) for line in path.read_text(encoding="utf-8").splitlines() if len(line.split()) >= 2]
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        fields = line.replace(",", " ").split()
+        if len(fields) < 2:
+            continue
+        try:
+            rows.append(tuple(map(float, fields[:2])))
+        except ValueError:
+            continue
     return Curve([x for x, _ in rows], [y for _, y in rows])
 
 def test_bundle_dataset_and_exact_ownership_contract():

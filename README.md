@@ -6,7 +6,7 @@ The pipeline keeps the nine bundled FR/PEQ pairs, reconstructs each active PK PE
 
 The final target owns the exact Base below 1 kHz and at/above 12 kHz, applies the full robust Delta from 1–11.2 kHz, and uses only a C1 smoothstep taper from 11.2–12 kHz. No fixed 8.1275 kHz attenuation, global smoothing, or final normalization is applied. Broad/local and narrow-peak outputs are diagnostics only.
 
-The API exposes `/api/engine/status`, `/api/base-targets`, and `/api/robust-targets/generate`. Generation requires exactly the nine distinct bundled IEM IDs and returns the final curve, intermediate stages, provenance hashes, validation, and diagnostics.
+The API exposes Base Target listing/detail/export/delete, IEM import/listing, Robust Target generation/export/detail, and persisted Robust Target history. Generation requires exactly the nine distinct bundled IEM IDs and returns the final curve, intermediate stages, provenance hashes, validation, and diagnostics. Generated names are derived from the selected Base Target name with one trailing ` Robust` suffix.
 
 ## Verification
 
@@ -17,4 +17,4 @@ pnpm install --frozen-lockfile
 pnpm run build
 ```
 
-The retired v0.3.0/V4.4 code, routes, documentation, and tests are removed from the production tree so they cannot be mistaken for authority.
+The retired v0.3.0/V4.4 implementation is not imported by production routes or the v0.3.1 engine. Existing V4.4-origin Base Target records remain available as clearly marked reference inputs so user data is preserved; their provenance is never presented as v0.3.1 engine output.
