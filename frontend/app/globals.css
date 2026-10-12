@@ -5,7 +5,42 @@
 :root { color-scheme: dark; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { @apply min-h-screen bg-zinc-950 text-zinc-100 antialiased; }
+body { @apply min-h-screen bg-[#090c10] text-zinc-100 antialiased; }
 button, input, textarea, select { @apply transition duration-200; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { @apply outline-none ring-2 ring-amber-400 ring-offset-2 ring-offset-zinc-950; }
 ::selection { @apply bg-amber-400 text-zinc-950; }
+
+.ambient { position: absolute; pointer-events: none; border-radius: 9999px; filter: blur(80px); opacity: .18; }
+.ambient-one { width: 420px; height: 420px; top: -120px; left: -180px; background: #d9a441; }
+.ambient-two { width: 360px; height: 360px; top: 520px; right: -170px; background: #4f6b89; opacity: .12; }
+.brand-mark { @apply grid h-9 w-9 place-items-center rounded-xl border border-amber-300/25 bg-amber-300/10 text-amber-300; }
+.card-shell { @apply rounded-[1.5rem] border border-white/10 bg-[#11151b]/90 p-5 shadow-[0_20px_80px_-50px_rgba(0,0,0,.9)] sm:p-7; }
+.studio-input { @apply min-h-11 w-full rounded-xl border border-white/10 bg-[#090c10] px-3 text-sm text-zinc-100 outline-none focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/20; }
+.eyebrow { @apply flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.22em] text-amber-300; }
+.hero-title { @apply mt-5 text-5xl font-semibold leading-[.98] tracking-[-.06em] text-white sm:text-7xl; }
+.hero-title span { @apply text-amber-300; }
+.section-title { @apply mt-2 text-xl font-semibold tracking-tight text-white; }
+.btn-primary, .btn-secondary, .btn-quiet, .btn-icon { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition; }
+.btn-primary { @apply bg-amber-300 text-[#17130a] shadow-[0_8px_28px_-12px_rgba(245,196,83,.8)] hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50; }
+.btn-secondary { @apply border border-white/10 bg-white/5 text-zinc-200 hover:border-amber-300/40 hover:text-amber-200; }
+.btn-quiet { @apply border border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200; }
+.btn-icon { @apply min-h-9 w-9 p-0 text-zinc-500 hover:bg-white/10 hover:text-white; }
+.status-dot { @apply h-2 w-2 rounded-full; }
+.status-online { @apply bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.7)]; }
+.status-offline { @apply bg-zinc-600; }
+.iem-row { @apply flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left transition hover:border-white/10 hover:bg-white/[.03] disabled:cursor-not-allowed disabled:opacity-40; }
+.iem-row-active { @apply border-amber-300/25 bg-amber-300/[.07] hover:border-amber-300/35 hover:bg-amber-300/[.09]; }
+.check-box { @apply grid h-5 w-5 shrink-0 place-items-center rounded-md border border-white/15 text-transparent; }
+.check-box-active { @apply border-amber-300 bg-amber-300 text-[#17130a]; }
+.skeleton-list { @apply rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-zinc-600; }
+.step-line { @apply h-px min-w-5 flex-1 bg-white/10; }
+.step-line-on { @apply bg-amber-300; }
+.empty-state { @apply flex min-h-64 flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-white/10 bg-white/[.015] text-center; }
+.empty-icon { @apply grid h-12 w-12 place-items-center rounded-2xl border border-amber-300/20 bg-amber-300/10 text-amber-300; }
+.legend-pill { @apply inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/10 px-2.5 text-xs text-zinc-600 hover:text-zinc-300; }
+.legend-pill-on { @apply border-amber-300/30 bg-amber-300/10 text-amber-200; }
+.stage-row { @apply flex min-h-10 items-center justify-between rounded-xl border border-white/10 px-3 text-left text-xs capitalize text-zinc-500 hover:border-white/20 hover:text-zinc-300 disabled:opacity-40; }
+.modal-backdrop { @apply fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm; }
+.modal-card { @apply max-h-[90vh] w-full max-w-3xl overflow-y-auto p-5 sm:p-7; }
+.import-form { @apply space-y-4 rounded-2xl border border-white/10 bg-black/15 p-4; }
+.import-form h3 { @apply mb-5 flex items-center gap-2 text-sm font-semibold text-zinc-200; }

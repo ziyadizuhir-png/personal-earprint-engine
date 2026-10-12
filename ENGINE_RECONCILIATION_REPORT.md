@@ -8,8 +8,8 @@ which delegates to the single canonical implementation in
 
 ## Files changed in this reconciliation
 
-- `engine/v44/v44.py` — active Personal Earprint formula stages, local safety,
-  diagnostics, and Hermite handoff.
+- `engine/v44/v44.py` — retained compatibility implementation of the active
+  Personal Earprint formula stages and diagnostics, and Hermite handoff.
 - `engine/v44/classification.py` — only Feature Classification remains
   unresolved.
 - `engine/v44_engine.py` — compatibility import surface was audited and
@@ -34,10 +34,10 @@ The repository Base Target resource used is
 | Exact PK/LS/HS biquad reconstruction | PASS |
 | Desired Response | PASS |
 | Personal Delta | PASS |
-| Huber center, c=1.345 | PASS |
+| Pointwise median center | PASS |
 | MAD scale, 1.4826 | PASS |
 | Consensus epsilon, 0.25 dB | PASS |
-| Local 8.13 kHz safety | PASS |
+| Local safety transform | PASS (identity; no default notch) |
 | 1–10 kHz ownership | PASS |
 | 10–12 kHz ownership | PASS |
 | 12–14 kHz Hermite handoff | PASS |
@@ -92,7 +92,17 @@ pytest backend/tests
 pytest tests/test_v44_engine.py
 ```
 
-No PEQ solver was reintroduced.
+No PEQ solver was reintroduced. The canonical production UI path loads source
+data from the server and executes the v0.3.0 TypeScript solver in the browser.
+
+## UI recovery / redesign
+
+The frontend was rebuilt around the v0.3.0 workflow: prepare IEM voices,
+choose the Base Target, generate in the browser, then inspect/export the final
+curve. The new UI adds a responsive studio layout, readiness/provenance cues,
+clear ownership bands, a focused upload dialog, and a diagnostics disclosure.
+It intentionally does not present legacy V4.4/Huber stages as active product
+behavior.
 
 ## PEQ ingestion reconciliation
 

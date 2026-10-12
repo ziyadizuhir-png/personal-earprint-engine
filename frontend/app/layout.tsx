@@ -4,8 +4,8 @@ import { Inter } from "next/font/google";
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata = {
-  title: "Personal Earprint Engine",
-  description: "Personal IEM earprint engine",
+  title: "Personal Earprint Studio",
+  description: "Build a personal IEM target from your listening data.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
