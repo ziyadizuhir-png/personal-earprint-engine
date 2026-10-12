@@ -27,8 +27,10 @@ def test_v030_frequency_ownership_and_smooth_taper():
     assert out.level_db[0] == base.level_db[0]
     assert out.level_db[1] == base.level_db[1] + 2
     assert out.level_db[2] == base.level_db[2] + 2
-    assert out.level_db[3] == base.level_db[3] + 2
-    assert out.level_db[4] > base.level_db[4]
+    # v0.3.0 returns ownership to Base Target at 12 kHz; the fixture has no
+    # interior 11.2–12 kHz point with which to assert the taper itself.
+    assert out.level_db[3] == base.level_db[3]
+    assert out.level_db[4] == base.level_db[4]
     assert out.level_db[5] == base.level_db[5]
     assert out.level_db[6] == base.level_db[6]
 

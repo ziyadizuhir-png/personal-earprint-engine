@@ -49,6 +49,18 @@ class IEMInput:
     peq_text: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        """Keep the small public fixture constructor backwards compatible.
+
+        Early v0.3.0 contract fixtures passed ``(id, measurement, peq_text)``
+        while the production model uses ``(id, original, prepared, peq_text)``.
+        Treat that legacy shape as an already-prepared measurement instead of
+        allowing a string to fail later inside the numerical pipeline.
+        """
+        if isinstance(self.prepared_measurement, str) and not self.peq_text:
+            object.__setattr__(self, "peq_text", self.prepared_measurement)
+            object.__setattr__(self, "prepared_measurement", self.original_measurement)
+
 
 @dataclass(frozen=True)
 class PEQFilter:
