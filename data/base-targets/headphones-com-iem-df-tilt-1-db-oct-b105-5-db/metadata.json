@@ -1,0 +1,9 @@
+{
+  "name": "Headphones.com IEM DF (Tilt -1 dB/oct, B105 5 dB)",
+  "slug": "headphones-com-iem-df-tilt-1-db-oct-b105-5-db",
+  "kind": "base",
+  "status": "validated",
+  "files": {"target": "target.csv", "target_source": "target_source.txt", "metadata": "metadata.json"},
+  "engine": {"target_version": "0.3.1", "normalization_anchor_hz": 1000.0, "mathematics_applied": false},
+  "source_hashes": {"target_source_sha256": "c9632d65661ac7ebf64a1baba805f7b3315dd31b0b0b76d256353e49895479bc"}
+}

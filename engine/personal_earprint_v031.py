@@ -1,23 +1,30 @@
-"""Auditable Personal Earprint Robust Target calculations.
+"""Canonical Personal EarPrint v0.3.1 implementation.
 
-This module deliberately does not import the legacy engine.  V4.4 owns its
-master grid, 1 kHz anchor, PEQ reconstruction, and Robust Target contract.
-Feature Classification remains an explicit extension point because its
-qualitative categories and thresholds are not defined by the production
-formula. All numeric Robust Target stages implemented here are canonical.
+This is a direct library implementation of the uploaded v0.3.1 bundle.
+There is deliberately no compatibility path to the retired v0.3.0/V4.4
+implementations.
 """
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 import math
 import re
-from typing import Any, Callable, Literal, Sequence
+from typing import Any, Literal, Sequence
 
 import numpy as np
 
 AnchorHz = 1000.0
 ConsensusEpsilonDb = 0.25
 TargetMode = Literal["robust_target"]
+ENGINE_VERSION = "Personal EarPrint Engine 0.3.1"
+ALGORITHM_VERSION = "PersonalDelta-FullBand-0.3.1"
+SAMPLE_RATE_HZ = 48000.0
+HUBER_C = 1.345
+HUBER_TOL_DB = 1.0e-8
+HUBER_MAX_ITER = 100
+SCALE_FLOOR_DB = 0.10
+EDGE_TAPER_START_HZ = 11200.0
+PERSONALIZATION_END_HZ = 12000.0
 
 
 @dataclass(frozen=True)
@@ -59,7 +66,7 @@ class PEQFilter:
 
 
 @dataclass
-class V44Result:
+class V031Result:
     mode: TargetMode
     master_grid_hz: list[float]
     base_target: Curve
@@ -71,7 +78,7 @@ class V44Result:
     n_plus: list[int]
     n_minus: list[int]
     n_zero: list[int]
-    # These are intentionally optional: V4.4 does not currently lock them.
+    # Diagnostics required by the v0.3.1 bundle.
     G: Curve | None = None
     C: Curve | None = None
     broad: Curve | None = None
@@ -82,6 +89,10 @@ class V44Result:
     stage_status: dict[str, str] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     robust_delta: Curve | None = None
+    engine_version: str = ENGINE_VERSION
+    algorithm_version: str = ALGORITHM_VERSION
+    huber_iterations: list[int] = field(default_factory=list)
+    narrow_peak_diagnostics: list[dict[str, float | str]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -103,7 +114,7 @@ def normalize_at_1000(f: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 
 def require_exact_1000_hz(f: np.ndarray, label: str) -> None:
-    """Reject unprepared V4.4 inputs instead of silently interpolating the anchor."""
+    """Reject inputs that do not contain the exact v0.3.1 anchor."""
     if not np.any(np.isclose(f, AnchorHz, rtol=0.0, atol=1.0e-12)):
         raise ValueError(f"{label} must contain an exact 1000 Hz calculation anchor")
 
@@ -138,6 +149,8 @@ def parse_peq(text: str | Sequence[PEQFilter]) -> list[PEQFilter]:
         lowered = line.lower()
         if line.startswith(_COMMENT_PREFIXES) or lowered.startswith(_METADATA_PREFIXES):
             continue
+        if re.search(r"\boff\b", lowered):
+            continue
         m = _FILTER_RE.fullmatch(line)
         if not m:
             parts = [p.strip() for p in line.split(",")]
@@ -156,6 +169,8 @@ def parse_peq(text: str | Sequence[PEQFilter]) -> list[PEQFilter]:
             raise ValueError(f"Malformed PEQ filter on line {line_number}") from exc
         filters.append(item)
     for item in filters:
+        if item.kind != "PK":
+            raise ValueError("v0.3.1 accepts only active PK filters")
         if not all(math.isfinite(value) for value in (item.frequency_hz, item.gain_db, item.q)) or item.frequency_hz <= 0 or item.q <= 0:
             raise ValueError("PEQ filters require finite positive frequency/Q and finite gain")
     return filters
@@ -193,62 +208,67 @@ def _curve(f: np.ndarray, y: np.ndarray) -> Curve:
     return Curve.from_arrays(f, y)
 
 
-def construct_target(base: Curve, delta_safe: Curve) -> Curve:
-    """Apply v0.3.0 ownership: personal 1–11.2 kHz, smooth taper to 12 kHz."""
+def smoothstep(t: np.ndarray) -> np.ndarray:
+    t = np.clip(t, 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def construct_target(base: Curve, robust_delta: Curve) -> Curve:
+    """Apply v0.3.1 ownership: full delta, then only the boundary taper."""
     f, b = base.array()
-    fd, d = delta_safe.array()
+    fd, d = robust_delta.array()
     d = interpolate_log(fd, d, f)
-    w = np.where(f < 1000.0, 0.0, np.where(f <= 11200.0, 1.0, np.where(f < 12000.0, 1.0 - (3 * ((f - 11200.0) / 800.0) ** 2 - 2 * ((f - 11200.0) / 800.0) ** 3), 0.0)))
+    w = np.zeros_like(f)
+    w[(f >= AnchorHz) & (f < EDGE_TAPER_START_HZ)] = 1.0
+    taper = (f >= EDGE_TAPER_START_HZ) & (f < PERSONALIZATION_END_HZ)
+    w[taper] = 1.0 - smoothstep((f[taper] - EDGE_TAPER_START_HZ) / 800.0)
     return _curve(f, b + d * w)
 
 
 def analyze_broad_local(frequency_hz: np.ndarray, robust_delta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Deterministic approximately 1/12-octave broad/local diagnostic split."""
+    """Gaussian log-frequency diagnostic only; never alters robust Delta."""
     log_frequency = np.log2(frequency_hz)
     broad = np.empty_like(robust_delta, dtype=float)
-    half_window = 1.0 / 24.0
+    sigma = 1.0 / 12.0
     for index, center in enumerate(log_frequency):
-        mask = np.abs(log_frequency - center) <= half_window
-        broad[index] = float(np.mean(robust_delta[mask]))
+        weights = np.exp(-0.5 * ((log_frequency - center) / sigma) ** 2)
+        broad[index] = float(np.sum(weights * robust_delta) / np.sum(weights))
     return broad, robust_delta - broad
 
 
-def apply_local_safety(frequency_hz: np.ndarray, delta: np.ndarray) -> np.ndarray:
-    """v0.3.0 has no default safety notch; preserve the robust delta exactly."""
-    return np.asarray(delta, dtype=float).copy()
-
-
-def huber_center(matrix: np.ndarray, c: float = 1.345, floor_db: float = 1.0e-6, max_iter: int = 50) -> np.ndarray:
-    """Deterministic pointwise Huber IRLS center, seeded by the median."""
+def huber_center(matrix: np.ndarray, c: float = HUBER_C, floor_db: float = SCALE_FLOOR_DB, max_iter: int = HUBER_MAX_ITER) -> tuple[np.ndarray, np.ndarray]:
+    """Return the Huber IRLS center and per-frequency iteration counts."""
     mu = np.median(matrix, axis=0)
     mad = np.median(np.abs(matrix - mu), axis=0)
     scale = np.maximum(1.4826 * mad, floor_db)
-    for _ in range(max_iter):
+    iterations = np.zeros(matrix.shape[1], dtype=int)
+    for iteration in range(1, max_iter + 1):
         residual = matrix - mu
         k = c * scale
         abs_residual = np.abs(residual)
         ratio = np.divide(k, abs_residual, out=np.zeros_like(abs_residual), where=abs_residual != 0.0)
         weights = np.where(abs_residual <= k, 1.0, ratio)
         next_mu = np.sum(weights * matrix, axis=0) / np.sum(weights, axis=0)
-        if np.max(np.abs(next_mu - mu)) <= 1.0e-10:
-            return next_mu
+        iterations[np.abs(next_mu - mu) > HUBER_TOL_DB] = iteration
+        if np.max(np.abs(next_mu - mu)) <= HUBER_TOL_DB:
+            return next_mu, iterations
         mu = next_mu
-    return mu
+    return mu, iterations
 
 
-def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "robust_target", sample_rate_hz: float = 48000.0, delta_safe: Curve | None = None) -> V44Result:
+def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "robust_target", sample_rate_hz: float = SAMPLE_RATE_HZ) -> V031Result:
     if mode != "robust_target":
         raise ValueError("production engine accepts only the Robust Target contract")
     bf, by = base_target.array()
-    require_exact_1000_hz(bf, "Base Target")
-    if bf[0] > 20 or bf[-1] < 14000:
-        raise ValueError("base target must cover the complete V4.4 ownership range")
+    if bf[0] > 20 or bf[-1] < 12000:
+        raise ValueError("base target must cover the complete v0.3.1 ownership range")
+    bf = np.unique(np.r_[bf, AnchorHz, EDGE_TAPER_START_HZ, PERSONALIZATION_END_HZ])
+    by = interpolate_log(base_target.array()[0], base_target.array()[1], bf)
     bn = normalize_at_1000(bf, by)
     per_iem: dict[str, dict[str, Curve]] = {}
     deltas: list[np.ndarray] = []
     for iem in iems:
         mf, my = iem.prepared_measurement.array()
-        require_exact_1000_hz(mf, f"Prepared measurement for {iem.id}")
         mi = interpolate_log(mf, my, bf)
         mi_n = normalize_at_1000(bf, mi)
         peq = reconstruct_peq(parse_peq(iem.peq_text), bf, sample_rate_hz)
@@ -269,28 +289,38 @@ def generate(base_target: Curve, iems: Sequence[IEMInput], mode: TargetMode = "r
     g_values = np.divide(np.abs(np.asarray(n_plus) - np.asarray(n_minus)), n_active, out=np.zeros_like(median), where=n_active != 0)
     c_values = np.divide(np.maximum(np.asarray(n_plus), np.asarray(n_minus)), n_active, out=np.zeros_like(median), where=n_active != 0)
     c_curve = _curve(bf, c_values) if np.all(n_active != 0) else None
-    result = V44Result(mode, bf.tolist(), _curve(bf, by), _curve(bf, bn), per_iem, {k: _curve(bf, v) for k, v in zip([x.id for x in iems], deltas)}, _curve(bf, median), _curve(bf, mad), n_plus, n_minus, n_zero, G=_curve(bf, g_values), C=c_curve)
+    result = V031Result(mode, bf.tolist(), _curve(bf, by), _curve(bf, bn), per_iem, {k: _curve(bf, v) for k, v in zip([x.id for x in iems], deltas)}, _curve(bf, median), _curve(bf, mad), n_plus, n_minus, n_zero, G=_curve(bf, g_values), C=c_curve)
     for curves in result.per_iem.values():
         measured = np.asarray(curves["normalized_measured_fr"].level_db)
         desired = np.asarray(curves["desired_response"].level_db)
         curves["original_preferred_correction"] = _curve(bf, desired - measured)
-    robust = median.copy()
+    robust, huber_iterations = huber_center(matrix)
     result.robust_delta = _curve(bf, robust)
     broad, local = analyze_broad_local(bf, robust)
     result.broad = _curve(bf, broad)
     result.local = _curve(bf, local)
-    safe_values = apply_local_safety(bf, robust)
-    result.delta_safe = delta_safe or _curve(bf, safe_values)
-    result.final_target = construct_target(base_target, result.delta_safe)
+    result.delta_safe = _curve(bf, robust)
+    result.final_target = construct_target(_curve(bf, by), result.delta_safe)
     result.stage_status = {
-        "G": "IMPLEMENTED",
-        "C": "IMPLEMENTED; undefined at frequencies with Nactive=0",
-        "Broad": "IMPLEMENTED_DIAGNOSTIC: approximately 1/12-octave local mean",
-        "Local": "IMPLEMENTED_DIAGNOSTIC: RobustDelta - Broad",
-        "Feature Classification": "SPEC_BLOCKED: qualitative rules lack executable thresholds/categories",
-        "Delta Safe": "IMPLEMENTED: exact median; no default safety notch",
+        "source_identity": "IMPLEMENTED: bundle hashes verified by API provenance",
+        "peq_reconstruction": "IMPLEMENTED: 48 kHz digital PK biquads",
+        "robust_estimator": "IMPLEMENTED: median + raw MAD + Huber IRLS",
+        "broad_local_diagnostics": "DIAGNOSTIC_ONLY: Gaussian log-frequency smoother",
+        "narrow_peak_diagnostics": "DIAGNOSTIC_ONLY: residual local extrema",
+        "final_curve": "IMPLEMENTED: v0.3.1 ownership contract",
+        "export": "IMPLEMENTED: final target curve",
     }
-    result.warnings.append("Feature Classification remains specification-blocked; v0.3.0 applies no default 8.1275 kHz safety notch or global attenuation.")
+    result.warnings.append("Broad and Local are diagnostics only; no global smoothing or fixed 8.1275 kHz guardrail is applied.")
+    result.engine_version = ENGINE_VERSION
+    result.algorithm_version = ALGORITHM_VERSION
+    result.huber_iterations = huber_iterations.tolist()
+    peaks: list[dict[str, float | str]] = []
+    for index in range(1, len(bf) - 1):
+        if not (1000.0 <= bf[index] < 12000.0):
+            continue
+        if abs(local[index]) >= abs(local[index - 1]) and abs(local[index]) >= abs(local[index + 1]) and abs(local[index]) >= 1.0:
+            peaks.append({"frequency_hz": float(bf[index]), "residual_db": float(local[index]), "kind": "narrow_peak" if local[index] > 0 else "narrow_dip"})
+    result.narrow_peak_diagnostics = sorted(peaks, key=lambda item: abs(float(item["residual_db"])), reverse=True)[:24]
     final = np.asarray(result.final_target.level_db)
     for curves in result.per_iem.values():
         measured = np.asarray(curves["normalized_measured_fr"].level_db)

@@ -1,1 +1,1 @@
-"""Canonical V4.4 engine package."""
+"""Canonical Personal EarPrint v0.3.1 engine package."""
