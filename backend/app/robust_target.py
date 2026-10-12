@@ -37,6 +37,8 @@ def _iem(folder: Path) -> IEMInput:
 def _base_target(slug: str | None = None) -> tuple[Path, dict[str, Any], Curve]:
     target_id = slug or DEFAULT_BASE_ID
     if Path(target_id).name != target_id: raise HTTPException(400, "Invalid Base Target selection")
+    if target_id != DEFAULT_BASE_ID:
+        raise HTTPException(422, f"v0.3.1 only supports the bundle Base Target: {DEFAULT_BASE_ID}")
     folder = BASE_TARGET_ROOT / target_id
     source = folder / "target_source.txt"
     if not source.exists(): raise HTTPException(404, f"Bundle Base Target not found: {target_id}")
@@ -61,7 +63,10 @@ def engine_status() -> dict[str, Any]:
 
 @router.get("/base-targets")
 def base_targets() -> dict[str, Any]:
-    return {"items": [{"name": _metadata(f).get("name", f.name), "slug": f.name, "kind": "base", "status": "validated", "is_default": f.name == DEFAULT_BASE_ID, "collection": "base-targets"} for f in discover_collection("base-targets") if f.is_dir()]}
+    folder = BASE_TARGET_ROOT / DEFAULT_BASE_ID
+    if not folder.is_dir():
+        return {"items": []}
+    return {"items": [{"name": _metadata(folder).get("name", DEFAULT_BASE_ID), "slug": DEFAULT_BASE_ID, "kind": "base", "status": "validated", "is_default": True, "collection": "base-targets"}]}
 
 @router.get("/robust-targets")
 def robust_targets() -> dict[str, Any]: return {"items": []}
