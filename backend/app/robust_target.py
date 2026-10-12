@@ -29,7 +29,7 @@ def engine_status() -> dict:
     targets = discover_collection("base-targets")
     default_folder = _default_target_folder()
     ready = valid > 0 and default_folder is not None
-    return {"status": "ready" if ready else "not_ready", "engine": "dynamic-robust-target", "version": "1.0.0", "engine_math": "V4.4", "storage": storage_info(), "produces": ["robust_target_curve"], "peq_output": False, "dataset": {"discovered_iems": len(discovered), "valid_active_iems": valid, "skipped_iems": skipped}, "base_targets": {"available": len(targets), "active": default_folder.name if default_folder else None}}
+    return {"status": "ready" if ready else "not_ready", "engine": "personal-earprint-studio", "version": "0.3.0", "engine_math": "v0.3.0-browser-typescript", "storage": storage_info(), "produces": ["robust_target_curve"], "peq_output": False, "solver_location": "browser", "dataset": {"discovered_iems": len(discovered), "valid_active_iems": valid, "skipped_iems": skipped}, "base_targets": {"available": len(targets), "active": default_folder.name if default_folder else None}}
 
 
 @router.get("/base-targets")
@@ -53,6 +53,26 @@ def robust_targets() -> dict:
             continue
         items.append(metadata)
     return {"items": items}
+
+
+@router.get("/robust-targets/inputs")
+def robust_target_inputs(base_target_id: str | None = None, iem_ids: str | None = None) -> dict:
+    """Serve source curves to the browser v0.3.0 engine; never solve PEQ here."""
+    base = _base_target(base_target_id)
+    requested = [item for item in (iem_ids.split(",") if iem_ids else sorted(folder.name for folder in discover_collection("iems"))) if item]
+    available = {folder.name: folder for folder in discover_collection("iems")}
+    if not requested:
+        raise HTTPException(422, "At least one IEM is required")
+    if len(set(requested)) != len(requested):
+        raise HTTPException(400, "Duplicate IEM votes are not allowed")
+    rows = []
+    for item in requested:
+        folder = available.get(item)
+        if folder is None:
+            raise HTTPException(404, f"IEM not found: {item}")
+        iem = _iem(folder)
+        rows.append({"id": item, "measurement": iem.prepared_measurement.__dict__, "preferred": iem.peq_text})
+    return {"base": base[2].__dict__, "base_target_id": base[0].name, "base_target_name": base[1].get("name", base[0].name), "iems": rows, "solver": "browser-typescript-v0.3.0"}
 
 
 @router.get("/robust-targets/{target_id}")

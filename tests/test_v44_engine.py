@@ -22,12 +22,12 @@ def test_master_grid_anchor_statistics_and_pending_stages():
     assert result.final_target is not None
     assert result.delta_safe is not None
 
-def test_frequency_ownership_and_c1_handoff():
+def test_v030_frequency_ownership_and_smooth_taper():
     f, base, _ = fixture(); delta = curve(f, np.full_like(f, 2.0)); out = construct_target(base, delta)
     assert out.level_db[0] == base.level_db[0]
     assert out.level_db[1] == base.level_db[1] + 2
     assert out.level_db[2] == base.level_db[2] + 2
-    assert out.level_db[3] == base.level_db[3] + 1
+    assert out.level_db[3] == base.level_db[3] + 2
     assert out.level_db[4] > base.level_db[4]
     assert out.level_db[5] == base.level_db[5]
     assert out.level_db[6] == base.level_db[6]
@@ -55,7 +55,7 @@ def test_v44_inputs_require_exact_1000_hz_anchor():
         raise AssertionError("unprepared V4.4 input was accepted")
 
 
-def test_personal_formula_huber_and_local_safety_are_production_stages():
+def test_personal_formula_median_and_no_default_local_safety():
     f, base, iem = fixture()
     result = generate(base, [iem])
     anchor = result.master_grid_hz.index(1000.0)
@@ -68,5 +68,4 @@ def test_personal_formula_huber_and_local_safety_are_production_stages():
     assert result.stage_status["Feature Classification"].startswith("SPEC_BLOCKED")
     assert np.isclose(huber_center(np.array([[0.0, 1.0], [0.0, 3.0]]), c=1.345)[0], 0.0)
     safety = apply_local_safety(np.array([8127.5, 1000.0]), np.array([1.0, 1.0]))
-    assert np.isclose(safety[0], 0.55)
-    assert safety[1] > 0.99
+    assert np.allclose(safety, [1.0, 1.0])
