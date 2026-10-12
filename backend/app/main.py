@@ -75,9 +75,13 @@ def health():
 
 @app.get("/api/iems")
 def list_iems():
+    discovered = {folder.name: folder for folder in discover_collection("iems")}
     items = list_collection(IEM_ROOT, "iems")
     for item in items:
-        folder = IEM_ROOT / item["slug"]
+        # The active DATA_ROOT may be an empty persistent mount while the
+        # bundled repository records live under /app/data. Use the folder
+        # returned by discovery instead of reconstructing it under DATA_ROOT.
+        folder = discovered[item["slug"]]
         preferred = folder / "preferred.txt"
         item.update({"has_measurement": (folder / "measurement.csv").exists(), "has_preferred": preferred.exists(), "peq_source": "preferred.txt", "peq_valid": False, "peq_filter_count": 0})
         if not preferred.exists():
