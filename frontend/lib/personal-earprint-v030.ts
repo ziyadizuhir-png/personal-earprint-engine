@@ -7,6 +7,7 @@ export type V030Result = {
   median_delta: Curve;
   mad: Curve;
   final_target: Curve;
+  grid: { master_frequency_hz: number[]; represented_frequency_hz: number[]; clipped: boolean };
   diagnostics: { n_plus: number[]; n_minus: number[]; n_zero: number[]; warnings: string[] };
 };
 
@@ -78,5 +79,5 @@ export function generateV030(base: Curve, inputs: V030Input[]): V030Result {
   const median_delta = { frequency_hz: [...grid], level_db: grid.map((_, i) => median(deltas.map((d) => d[i]))) }; const mad = { frequency_hz: [...grid], level_db: grid.map((_, i) => median(deltas.map((d) => Math.abs(d[i] - median_delta.level_db[i])))) }; const n_plus = grid.map((_, i) => deltas.filter((d) => d[i] > EPSILON_DB).length); const n_minus = grid.map((_, i) => deltas.filter((d) => d[i] < -EPSILON_DB).length); const n_zero = grid.map((_, i) => deltas.length - n_plus[i] - n_minus[i]);
   const final_target = { frequency_hz: [...grid], level_db: grid.map((f, i) => { const baseLevel = interpolateLog(base, [f])[0]; if (f < 1000 || f >= 12000) return baseLevel; if (f <= 11200) return baseLevel + median_delta.level_db[i]; const t = (f - 11200) / 800; const smooth = 1 - (3 * t * t - 2 * t * t * t); return baseLevel + median_delta.level_db[i] * smooth; }) };
   const warnings = ["v0.3.0 uses no default 8.1275 kHz safety notch.", "11.2–12 kHz taper uses cubic smoothstep pending confirmation of the original source artifact."]; if (grid.length !== base.frequency_hz.length) warnings.push("Master grid was clipped to the common covered range; no measurement extrapolation was applied.");
-  return { normalized_base: baseOnGrid, per_iem, median_delta, mad, final_target, diagnostics: { n_plus, n_minus, n_zero, warnings } };
+  return { normalized_base: baseOnGrid, per_iem, median_delta, mad, final_target, grid: { master_frequency_hz: [...base.frequency_hz], represented_frequency_hz: [...grid], clipped: grid.length !== base.frequency_hz.length }, diagnostics: { n_plus, n_minus, n_zero, warnings } };
 }
