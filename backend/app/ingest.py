@@ -7,7 +7,7 @@ import math
 import re
 from pathlib import Path
 
-from engine.v44_engine import parse_peq
+from engine.personal_earprint_v031 import parse_peq
 
 from .storage import slugify, unique_iem_dir, unique_target_dir
 
@@ -155,7 +155,7 @@ def ingest_iem(name: str, measurement, preferred, notes: str | None = None) -> d
             "sample_rate_hz_default": 48000,
         },
         "engine": {
-            "target_version": "V4.4",
+            "target_version": "0.3.1",
             "normalization_anchor_hz": 1000.0,
             "grid_policy": "Base Target grid will be the Master Grid during target generation.",
         },
@@ -172,7 +172,7 @@ def ingest_iem(name: str, measurement, preferred, notes: str | None = None) -> d
 
 
 def ingest_target(name: str, target, kind: str = "base", notes: str | None = None) -> dict:
-    """Store an uploaded target without applying any V4.4 target mathematics."""
+    """Store an uploaded source target without applying target mathematics."""
     if kind not in {"base", "custom"}:
         raise ValueError("Target kind must be 'base' or 'custom'.")
 
@@ -194,7 +194,7 @@ def ingest_target(name: str, target, kind: str = "base", notes: str | None = Non
         },
         "target": target_info,
         "engine": {
-            "target_version": "V4.4-backbone",
+            "target_version": "0.3.1",
             "normalization_anchor_hz": 1000.0,
             "mathematics_applied": False,
         },

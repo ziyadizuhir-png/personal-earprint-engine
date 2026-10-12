@@ -37,12 +37,14 @@ def test_ingest_target_keeps_source_and_marks_math_unapplied(monkeypatch, tmp_pa
     assert metadata["engine"]["mathematics_applied"] is False
 
 
-def test_preferred_validation_counts_supported_filters_and_rejects_malformed():
+def test_preferred_validation_counts_active_pk_filters_and_rejects_malformed():
     info = validate_preferred_text(
-        "# SoundEQ Dore\nFilter 1: ON PK Fc 1000 Hz Gain -2.00 dB Q 1.00\nHS,80,3,0.7\n"
+        "# SoundEQ Dore\nFilter 1: ON PK Fc 1000 Hz Gain -2.00 dB Q 1.00\nFilter 2: OFF PK Fc 80 Hz Gain 3 dB Q 0.7\n"
     )
     assert info["valid"] is True
-    assert info["filter_count"] == 2
+    assert info["filter_count"] == 1
+    with pytest.raises(ValueError, match="only active PK"):
+        validate_preferred_text("HS,80,3,0.7\n")
     with pytest.raises(ValueError, match="Malformed"):
         validate_preferred_text("Filter 1: ON PK Fc 1000 Hz Gain nope dB Q 1.00\n")
 

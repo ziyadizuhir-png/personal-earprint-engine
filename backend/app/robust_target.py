@@ -1,131 +1,82 @@
-"""Stable Robust Target API contract."""
+"""Production API for the uploaded Personal EarPrint v0.3.1 bundle."""
 from __future__ import annotations
-
-import hashlib
-import json
+import hashlib, json
 from pathlib import Path
+from typing import Any
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
-from engine.robust_target import generate_robust_target
-from engine.v44.v44 import Curve, IEMInput
+from engine.personal_earprint_v031 import Curve, IEMInput, generate
 from .ingest import sha256_file
-from .storage import BASE_TARGET_ROOT, IEM_ROOT, TARGET_ROOT, discover_collection, storage_info
-from .v44 import _base_target, _default_target_folder, _iem
+from .storage import BASE_TARGET_ROOT, discover_collection, storage_info
 
-router = APIRouter(prefix="/api", tags=["robust-target"])
+router = APIRouter(prefix="/api", tags=["personal-earprint-v031"])
+DEFAULT_BASE_ID = "headphones-com-iem-df-tilt-1-db-oct-b105-5-db"
+ENGINE_VERSION = "Personal EarPrint Engine 0.3.1"
 
+def _metadata(folder: Path) -> dict[str, Any]:
+    try: return json.loads((folder / "metadata.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError): return {}
+
+def _read_curve(path: Path) -> Curve:
+    rows = []
+    for line in path.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+        parts = line.strip().replace(",", "\t").split()
+        if len(parts) >= 2:
+            try: rows.append((float(parts[0]), float(parts[1])))
+            except ValueError: pass
+    rows = sorted(dict(rows).items())
+    if len(rows) < 2: raise ValueError(f"Curve file is invalid: {path.name}")
+    return Curve([f for f, _ in rows], [y for _, y in rows])
+
+def _iem(folder: Path) -> IEMInput:
+    measurement, preferred = folder / "measurement_source.txt", folder / "preferred.txt"
+    if not measurement.exists() or not preferred.exists(): raise ValueError(f"IEM {folder.name} is missing the bundle source pair")
+    curve = _read_curve(measurement)
+    return IEMInput(folder.name, curve, curve, preferred.read_text(encoding="utf-8", errors="replace"), _metadata(folder))
+
+def _base_target(slug: str | None = None) -> tuple[Path, dict[str, Any], Curve]:
+    target_id = slug or DEFAULT_BASE_ID
+    if Path(target_id).name != target_id: raise HTTPException(400, "Invalid Base Target selection")
+    folder = BASE_TARGET_ROOT / target_id
+    source = folder / "target_source.txt"
+    if not source.exists(): raise HTTPException(404, f"Bundle Base Target not found: {target_id}")
+    return folder, _metadata(folder), _read_curve(source)
+
+def _curve(curve: Curve | None) -> dict[str, list[float]] | None:
+    return None if curve is None else {"frequency_hz": curve.frequency_hz, "level_db": curve.level_db}
+
+def _result(result: Any, meta: dict[str, Any], provenance: dict[str, Any], digest: str) -> dict[str, Any]:
+    data = result.to_dict()
+    data.update({"base_target_id": DEFAULT_BASE_ID, "base_target_name": meta.get("name", DEFAULT_BASE_ID), "active_iem_ids": list(result.personal_delta), "iem_count": len(result.personal_delta), "target_hash": digest, "provenance": provenance, "status": "ready"})
+    data["validation"] = {"exact_1000_hz": 1000.0 in result.master_grid_hz, "master_grid_points": len(result.master_grid_hz), "base_exact_below_1k": all(a == b for a, b, f in zip(result.base_target.level_db, result.final_target.level_db, result.master_grid_hz) if f < 1000), "base_exact_at_or_above_12k": all(a == b for a, b, f in zip(result.base_target.level_db, result.final_target.level_db, result.master_grid_hz) if f >= 12000), "all_iems_retained": len(result.personal_delta) == 9}
+    return data
 
 @router.get("/engine/status")
-def engine_status() -> dict:
-    discovered = discover_collection("iems")
-    valid = 0
-    skipped: list[dict[str, str]] = []
-    for folder in discovered:
-        try:
-            _iem(folder)
-            valid += 1
-        except (OSError, ValueError) as exc:
-            skipped.append({"id": folder.name, "reason": str(exc)})
-    targets = discover_collection("base-targets")
-    default_folder = _default_target_folder()
-    ready = valid > 0 and default_folder is not None
-    return {"status": "ready" if ready else "not_ready", "engine": "dynamic-robust-target", "version": "1.0.0", "engine_math": "V4.4", "storage": storage_info(), "produces": ["robust_target_curve"], "peq_output": False, "dataset": {"discovered_iems": len(discovered), "valid_active_iems": valid, "skipped_iems": skipped}, "base_targets": {"available": len(targets), "active": default_folder.name if default_folder else None}}
-
+def engine_status() -> dict[str, Any]:
+    folders = discover_collection("iems"); valid, skipped = 0, []
+    for folder in folders:
+        try: _iem(folder); valid += 1
+        except (OSError, ValueError) as exc: skipped.append({"id": folder.name, "reason": str(exc)})
+    return {"status": "ready" if valid == 9 and (BASE_TARGET_ROOT / DEFAULT_BASE_ID).is_dir() else "not_ready", "engine": ENGINE_VERSION, "version": "0.3.1", "engine_math": "PersonalDelta-FullBand-0.3.1", "storage": storage_info(), "dataset": {"discovered_iems": len(folders), "valid_active_iems": valid, "skipped_iems": skipped}, "base_target": DEFAULT_BASE_ID, "produces": ["robust_target_curve", "narrow_peak_diagnostics"]}
 
 @router.get("/base-targets")
-def base_targets() -> dict:
-    from .main import list_collection
-    default_folder = _default_target_folder()
-    items = list_collection(BASE_TARGET_ROOT, "base-targets")
-    for item in items:
-        item["is_default"] = default_folder is not None and item["slug"] == default_folder.name
-    return {"items": items}
-
+def base_targets() -> dict[str, Any]:
+    return {"items": [{"name": _metadata(f).get("name", f.name), "slug": f.name, "kind": "base", "status": "validated", "is_default": f.name == DEFAULT_BASE_ID, "collection": "base-targets"} for f in discover_collection("base-targets") if f.is_dir()]}
 
 @router.get("/robust-targets")
-def robust_targets() -> dict:
-    items = []
-    for folder in discover_collection("targets"):
-        metadata_path = folder / "metadata.json"
-        try:
-            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        items.append(metadata)
-    return {"items": items}
-
-
-@router.get("/robust-targets/{target_id}")
-def get_robust_target(target_id: str) -> dict:
-    if Path(target_id).name != target_id:
-        raise HTTPException(400, "Invalid Robust Target id")
-    path = TARGET_ROOT / target_id / "artifact.json"
-    if not path.exists():
-        raise HTTPException(404, "Robust Target not found")
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise HTTPException(500, "Robust Target artifact is invalid") from exc
-
-
-@router.get("/robust-targets/{target_id}/export", response_class=PlainTextResponse)
-def export_robust_target(target_id: str) -> str:
-    target = get_robust_target(target_id)
-    curve = target.get("curve", {})
-    return "\n".join(f"{frequency:.6f}\t{level:.6f}" for frequency, level in zip(curve.get("frequency_hz", []), curve.get("level_db", [])))
-
+def robust_targets() -> dict[str, Any]: return {"items": []}
 
 @router.post("/robust-targets/generate")
-def generate(payload: dict) -> dict:
-    slug = payload.get("base_target_id")
-    try:
-        base = _base_target(slug)
-        ids = payload.get("iem_ids")
-        if ids is not None and (not isinstance(ids, list) or not ids):
-            raise HTTPException(422, "iem_ids must be a non-empty list when provided")
-        folders = []
-        available = {folder.name: folder for folder in discover_collection("iems")}
-        for item in ids if ids is not None else sorted(available):
-            if not isinstance(item, str) or not item or Path(item).name != item:
-                raise HTTPException(400, "Invalid IEM selection")
-            folder = available.get(item)
-            if folder is None:
-                raise HTTPException(404, f"IEM not found: {item}")
-            folders.append(folder)
-        iems = [_iem(folder) for folder in folders]
-        result = generate_robust_target(base, iems)
-    except (ValueError, FileNotFoundError) as exc:
-        raise HTTPException(422, str(exc)) from exc
-    active_iem_ids = [folder.name for folder in folders]
-    iem_provenance = []
-    for folder in folders:
-        iem_provenance.append({"id": folder.name, "measurement_sha256": sha256_file(folder / "measurement.csv"), "preferred_sha256": sha256_file(folder / "preferred.txt")})
-    iem_provenance.sort(key=lambda item: item["id"])
-    base_target_file = base[0] / base[1].get("files", {}).get("target", "target.csv")
-    base_target_sha256 = sha256_file(base_target_file)
-    provenance = {"base_target_id": base[0].name, "base_target_sha256": base_target_sha256, "iems": iem_provenance}
-    dataset_revision = hashlib.sha256(json.dumps(provenance, separators=(",", ":"), sort_keys=True).encode()).hexdigest()
-    canonical = json.dumps({"provenance": provenance, "iem_ids": active_iem_ids, "frequency_hz": result.final_target.frequency_hz, "level_db": result.final_target.level_db}, separators=(",", ":"), allow_nan=False).encode()
-    digest = hashlib.sha256(canonical).hexdigest()
-    target_id = digest[:16]
-    artifact = {"status": "ready", "robust_target_id": target_id, "target_hash": digest, "dataset_revision": dataset_revision, "provenance": provenance, "base_target_id": slug or base[0].name, "base_target_name": base[1].get("name", base[0].name), "active_iem_ids": active_iem_ids, "iem_count": len(iems), "canonical_curve_artifact": {"content_type": "application/json", "sha256": digest, "grid_type": "base_target_master"}, "interoperability_curve_artifact": {"content_type": "text/plain", "format": "tab-separated UTF-8", "path": f"/api/robust-targets/{target_id}/export"}, "validation": {"exact_1000_hz": True, "peq_filters": False}, "curve": result.final_target.__dict__, "base_target": result.base_target.__dict__, "final_target": result.final_target.__dict__, "intermediate": result.to_dict(), "warnings": result.warnings, "stage_status": result.stage_status}
-    artifact.update(result.to_dict())
-    folder = TARGET_ROOT / target_id
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / "artifact.json").write_text(json.dumps(artifact, separators=(",", ":"), allow_nan=False), encoding="utf-8")
-    (folder / "metadata.json").write_text(json.dumps({"robust_target_id": target_id, "target_hash": digest, "dataset_revision": dataset_revision, "status": "ready", "base_target_id": artifact["base_target_id"], "active_iem_ids": active_iem_ids, "iem_count": len(iems)}, separators=(",", ":")), encoding="utf-8")
-    return artifact
+def generate_target(payload: dict[str, Any]) -> dict[str, Any]:
+    folder, meta, base = _base_target(payload.get("base_target_id"))
+    folders = {f.name: f for f in discover_collection("iems")}
+    ids = payload.get("iem_ids") or sorted(folders)
+    if not isinstance(ids, list) or len(ids) != 9 or len(set(ids)) != 9: raise HTTPException(422, "v0.3.1 requires exactly nine distinct IEM votes")
+    try: result = generate(base, [_iem(folders[item]) for item in ids])
+    except (KeyError, OSError, ValueError) as exc: raise HTTPException(422, str(exc)) from exc
+    provenance = {"engine_version": ENGINE_VERSION, "algorithm_version": result.algorithm_version, "base_target_sha256": sha256_file(folder / "target_source.txt"), "iems": [{"id": f.name, "measurement_sha256": sha256_file(f / "measurement_source.txt"), "peq_sha256": sha256_file(f / "preferred.txt")} for f in sorted((folders[item] for item in ids), key=lambda p: p.name)]}
+    digest = hashlib.sha256(json.dumps({"provenance": provenance, "curve": _curve(result.final_target)}, separators=(",", ":"), sort_keys=True).encode()).hexdigest()
+    return _result(result, meta, provenance, digest)
 
-
-@router.post("/robust-targets/validate")
-def validate(payload: dict) -> dict:
-    target_id = payload.get("robust_target_id")
-    if target_id:
-        artifact = get_robust_target(target_id)
-    else:
-        artifact = generate(payload)
-    curve = artifact.get("curve", {})
-    frequencies = curve.get("frequency_hz", [])
-    levels = curve.get("level_db", [])
-    valid = bool(frequencies and len(frequencies) == len(levels) and all(frequencies[i] < frequencies[i + 1] for i in range(len(frequencies) - 1)))
-    return {"status": "valid" if valid else "invalid", "robust_target_id": artifact.get("robust_target_id"), "target_hash": artifact.get("target_hash"), "exact_1000_hz": 1000.0 in frequencies, "point_count": len(frequencies)}
+@router.get("/robust-targets/{target_id}/export", response_class=PlainTextResponse)
+def export_target(target_id: str) -> str: raise HTTPException(404, "Targets are generated on demand in v0.3.1")
