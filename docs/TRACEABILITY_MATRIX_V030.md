@@ -26,6 +26,7 @@ Legacy reference only: `docs/V44_SPEC.md`, `docs/ZUHIR_PERSONAL_EARPRINT_V4.4_FI
 | No global renormalization | `final_target` construction | PASS | The output preserves the Base Target outside the personal domain. |
 | Target ownership/taper | UI ownership facts and result legend | PASS | The workflow visibly communicates the three frequency regions. |
 | PEQ solver location | `GET /api/robust-targets/inputs` + browser `generateV030()` | PASS | Backend stores/serves source data; TypeScript owns PEQ solving. |
+| Anti-overfit PEQ fitting | `frontend/lib/peq-solver-v030.ts` + `docs/PEQ_SOLVER_ANTI_OVERFIT.md` | PASS / SPEC BLOCKED thresholds | Optional solver keeps canonical target math unchanged; evidence-gates narrow candidates, combines pointwise/ERB/shape/topology/stability objectives, simulates quantization, stops deterministically, rolls back to best state, and caps allocation at 10 bands. Numeric fitting controls have no v0.3.0 source values and remain configured SPEC BLOCKED defaults. |
 
 ## Architecture, storage, and deployment
 
